@@ -33,6 +33,10 @@ using G = groov::group<"group", bus, R>;
 constexpr auto grp = G{};
 } // namespace
 
+#if __STDC_HOSTED__ == 0
+extern "C" auto main() -> int;
+#endif
+
 auto main() -> int {
     using namespace groov::literals;
     data = 0xa5u;

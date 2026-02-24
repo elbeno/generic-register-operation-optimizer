@@ -23,6 +23,8 @@
 #include <string_view>
 #include <type_traits>
 
+template <typename...> struct undef;
+
 #ifndef ENABLE_GROOV_TEST
 namespace groov::test {
 using test_bus_list = stdx::type_map<>;
@@ -35,36 +37,26 @@ using get_bus = stdx::type_lookup_t<test::test_bus_list, stdx::cts_t<Name>, T>;
 }
 
 namespace groov {
-namespace detail {
-template <typename T> using name_of = typename T::name_t;
-} // namespace detail
-
 template <typename T>
 concept named =
-    stdx::is_specialization_of<typename T::name_t, stdx::cts_t>().value;
+    stdx::is_value_specialization_of_v<decltype(T::name), stdx::ct_string>;
+
+namespace detail {
+template <stdx::ct_string N> struct has_name_q {
+    template <named T> using fn = std::bool_constant<N == T::name>;
+};
+} // namespace detail
 
 template <stdx::ct_string Name, named... Ts> struct named_container {
-  private:
-    template <stdx::ct_string N> struct has_name_q {
-        template <named T>
-        using fn = std::is_same<detail::name_of<T>, stdx::cts_t<N>>;
-    };
-
-  public:
     constexpr static auto name = Name;
-    using name_t = stdx::cts_t<Name>;
     using children_t = boost::mp11::mp_list<Ts...>;
-
-    template <stdx::ct_string S>
-    using child_t = boost::mp11::mp_front<
-        boost::mp11::mp_copy_if_q<children_t, has_name_q<S>>>;
 };
 
 template <typename T>
 concept containerlike = requires { typename T::children_t; };
 
 template <typename C, stdx::ct_string Name>
-using get_child = typename C::template child_t<Name>;
+using get_child = decltype(resolve(C{}, path<Name>{}));
 
 template <typename T>
 concept fieldlike =
@@ -80,7 +72,7 @@ constexpr auto resolve_matches([[maybe_unused]] P p) {
     } else if constexpr (boost::mp11::mp_size<L>::value > 1) {
         return ambiguous_t{};
     } else {
-        return recursive_resolve<boost::mp11::mp_front<L>>(p);
+        return resolve(boost::mp11::mp_front<L>{}, p);
     }
 }
 
@@ -223,7 +215,16 @@ concept registerlike = fieldlike<T> and requires(T t) {
 template <registerlike R, typename R::offset_t N,
           typename R::offset_t Stride = sizeof(typename R::type_t)>
 struct indexed_reg {
+    using type_t = typename R::type_t;
+    using address_t = typename R::address_t;
     using offset_t = typename R::offset_t;
+    constexpr static auto name = R::name;
+
+    using children_t =
+        decltype([]<offset_t... Is>(std::integer_sequence<offset_t, Is...>) {
+            return boost::mp11::mp_list<
+                typename R::template with_offset<offset_t(Is * Stride)>...>{};
+        }(std::make_integer_sequence<offset_t, N>{}));
 
     template <pathlike P> constexpr static auto resolve(P p) {
         constexpr auto r = root(p);
@@ -251,18 +252,25 @@ struct indexed_reg {
                 if constexpr (n >= N) {
                     return invalid_t{};
                 } else {
-                    constexpr auto new_path = path<s.first>{} / leftover_path;
-                    constexpr offset_t offset = n * Stride;
-                    return groov::resolve(
-                        typename R::template with_offset<offset>{}, new_path);
+                    using child_t = boost::mp11::mp_at_c<children_t, n>;
+                    if constexpr (std::empty(leftover_path)) {
+                        return child_t{};
+                    } else {
+                        return groov::resolve(child_t{}, leftover_path);
+                    }
                 }
             }
         }
     }
 
-    constexpr auto operator[](std::size_t n) const -> detail::rt_offset_reg<R> {
+    constexpr auto operator[](std::size_t n) const {
         offset_t const offset = n * Stride;
-        return {{}, offset};
+        return detail::rt_offset_reg<R>{{}, offset};
+    }
+
+    template <typename T, auto I>
+    constexpr auto operator[](std::integral_constant<T, I>) const {
+        return boost::mp11::mp_at_c<children_t, I>{};
     }
 };
 
@@ -317,8 +325,7 @@ template <typename G, typename L> constexpr auto check_valid_config() -> void {
 }
 
 template <typename Group> struct register_for_path_q {
-    template <pathlike P>
-    using fn = typename Group::template child_t<root(P{})>;
+    template <pathlike P> using fn = get_child<Group, root(P{})>;
 };
 
 template <typename Group> struct register_for_paths_q {

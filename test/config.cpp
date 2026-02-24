@@ -5,6 +5,7 @@
 #include <async/concepts.hpp>
 
 #include <stdx/bit.hpp>
+#include <stdx/udls.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -273,7 +274,17 @@ TEST_CASE("indexed register resolves an indexed path (with offset)",
                                 decltype(groov::resolve(I{}, "reg[1]"_f))>);
 }
 
-TEST_CASE("indexed register is indexable", "[config]") {
+TEST_CASE("indexed register resolves an indexed path (with offset) with field",
+          "[config]") {
+    using namespace groov::literals;
+    using F = groov::field<"field", std::uint32_t, 0, 0>;
+    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
+    using I = groov::indexed_reg<R, 2>;
+    STATIC_CHECK(
+        std::is_same_v<F, decltype(groov::resolve(I{}, "reg[1].field"_f))>);
+}
+
+TEST_CASE("indexed register is runtime-indexable", "[config]") {
     using namespace groov::literals;
     using F = groov::field<"field", std::uint32_t, 0, 0>;
     using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
@@ -282,4 +293,32 @@ TEST_CASE("indexed register is indexable", "[config]") {
     STATIC_CHECK(
         std::is_same_v<groov::detail::rt_offset_reg<R> const, decltype(r)>);
     STATIC_CHECK(r.offset == 4);
+}
+
+TEST_CASE("indexed register is compile-time indexable", "[config]") {
+    using namespace groov::literals;
+    using namespace stdx::literals;
+    using F = groov::field<"field", std::uint32_t, 0, 0>;
+    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
+    using I = groov::indexed_reg<R, 2>;
+    constexpr auto r = I{}[1_c];
+    STATIC_CHECK(std::is_same_v<R::with_offset<4UL> const, decltype(r)>);
+    STATIC_CHECK(r.offset == 4);
+}
+
+TEST_CASE("indexed register in a group", "[config]") {
+    using R = groov::reg<"reg", std::uint32_t, 0>;
+    using I = groov::indexed_reg<R, 2>;
+    using G = groov::group<"group", bus, I>;
+    using X = groov::get_child<G, "reg[1]">;
+    STATIC_CHECK(std::is_same_v<X, R::with_offset<4UL>>);
+}
+
+TEST_CASE("runtime-indexed register resolves a path", "[config]") {
+    using namespace groov::literals;
+    using F = groov::field<"field", std::uint32_t, 0, 0>;
+    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
+    using I = groov::indexed_reg<R, 2>;
+    constexpr auto r = I{}[1];
+    STATIC_CHECK(std::is_same_v<F, decltype(groov::resolve(r, "reg.field"_f))>);
 }

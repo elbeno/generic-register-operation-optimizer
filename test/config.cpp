@@ -211,3 +211,75 @@ TEST_CASE("bus without transform_mask returns all bits set", "[config]") {
         std::same_as<decltype(groov::transform_mask<bus>(std::uint32_t{0b1u})),
                      std::uint32_t>);
 }
+
+TEST_CASE(
+    "indexed register resolves a non-indexed single-element path to itself",
+    "[config]") {
+    using namespace groov::literals;
+    using F = groov::field<"field", std::uint32_t, 0, 0>;
+    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
+    using I = groov::indexed_reg<R, 1>;
+    STATIC_CHECK(std::is_same_v<I, decltype(groov::resolve(I{}, "reg"_r))>);
+}
+
+TEST_CASE(
+    "indexed register gives an invalid resolution for an invalid path (1)",
+    "[config]") {
+    using namespace groov::literals;
+    using F = groov::field<"field", std::uint32_t, 0, 0>;
+    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
+    using I = groov::indexed_reg<R, 1>;
+    STATIC_CHECK(std::is_same_v<groov::invalid_t,
+                                decltype(groov::resolve(I{}, "invalid"_f))>);
+}
+
+TEST_CASE(
+    "indexed register gives an invalid resolution for an invalid path (2)",
+    "[config]") {
+    using namespace groov::literals;
+    using F = groov::field<"field", std::uint32_t, 0, 0>;
+    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
+    using I = groov::indexed_reg<R, 1>;
+    STATIC_CHECK(std::is_same_v<groov::invalid_t,
+                                decltype(groov::resolve(I{}, "reg.field"_f))>);
+}
+
+TEST_CASE(
+    "indexed register gives an invalid resolution for an invalid path (3)",
+    "[config]") {
+    using namespace groov::literals;
+    using F = groov::field<"field", std::uint32_t, 0, 0>;
+    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
+    using I = groov::indexed_reg<R, 1>;
+    STATIC_CHECK(std::is_same_v<groov::invalid_t,
+                                decltype(groov::resolve(I{}, "reg[1]"_f))>);
+}
+
+TEST_CASE("indexed register resolves an indexed path (no offset)", "[config]") {
+    using namespace groov::literals;
+    using F = groov::field<"field", std::uint32_t, 0, 0>;
+    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
+    using I = groov::indexed_reg<R, 1>;
+    STATIC_CHECK(std::is_same_v<R, decltype(groov::resolve(I{}, "reg[0]"_f))>);
+}
+
+TEST_CASE("indexed register resolves an indexed path (with offset)",
+          "[config]") {
+    using namespace groov::literals;
+    using F = groov::field<"field", std::uint32_t, 0, 0>;
+    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
+    using I = groov::indexed_reg<R, 2>;
+    STATIC_CHECK(std::is_same_v<R::with_offset<4UL>,
+                                decltype(groov::resolve(I{}, "reg[1]"_f))>);
+}
+
+TEST_CASE("indexed register is indexable", "[config]") {
+    using namespace groov::literals;
+    using F = groov::field<"field", std::uint32_t, 0, 0>;
+    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
+    using I = groov::indexed_reg<R, 2>;
+    constexpr auto r = I{}[1];
+    STATIC_CHECK(
+        std::is_same_v<groov::detail::rt_offset_reg<R> const, decltype(r)>);
+    STATIC_CHECK(r.offset == 4);
+}

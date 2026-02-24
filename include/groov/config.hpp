@@ -9,6 +9,7 @@
 #include <stdx/bit.hpp>
 #include <stdx/ct_string.hpp>
 #include <stdx/type_traits.hpp>
+#include <stdx/udls.hpp>
 #include <stdx/utility.hpp>
 
 #include <boost/mp11/algorithm.hpp>
@@ -19,6 +20,7 @@
 #include <cstddef>
 #include <iterator>
 #include <limits>
+#include <string_view>
 #include <type_traits>
 
 #ifndef ENABLE_GROOV_TEST
@@ -153,16 +155,16 @@ template <typename T> constexpr auto maybe_invoke(T value) {
     }
 }
 } // namespace detail
-template <typename R> constexpr auto get_address() {
-    return detail::maybe_invoke(R::address);
-}
 
+namespace detail {
 template <stdx::ct_string Name, std::unsigned_integral T, auto Address,
-          write_function WriteFn = w::replace, fieldlike... Fields>
-struct reg : field<Name, T, std::numeric_limits<T>::digits - 1, 0u, WriteFn,
-                   Fields...> {
+          auto Offset, write_function WriteFn = w::replace, fieldlike... Fields>
+struct ct_offset_reg : field<Name, T, std::numeric_limits<T>::digits - 1, 0u,
+                             WriteFn, Fields...> {
     using address_t = decltype(detail::maybe_invoke(Address));
     constexpr static auto address = Address;
+    using offset_t = decltype(Offset);
+    constexpr static auto offset = Offset;
 
     constexpr static auto children_mask =
         field<Name, T, std::numeric_limits<T>::digits - 1, 0u, WriteFn,
@@ -170,7 +172,7 @@ struct reg : field<Name, T, std::numeric_limits<T>::digits - 1, 0u, WriteFn,
 
     constexpr static T unused_mask =
         identity_write_function<WriteFn>
-            ? reg::template mask<T> & ~children_mask
+            ? ct_offset_reg::template mask<T> & ~children_mask
             : T{};
     constexpr static auto unused_identity_value =
         detail::compute_identity_value<WriteFn, T, unused_mask>();
@@ -186,29 +188,93 @@ struct reg : field<Name, T, std::numeric_limits<T>::digits - 1, 0u, WriteFn,
     }
 
     template <pathlike P> constexpr static auto resolve(P p) {
-        return detail::recursive_resolve<reg>(p);
+        return detail::recursive_resolve<ct_offset_reg>(p);
     }
+
+    template <auto O>
+    using with_offset = ct_offset_reg<Name, T, Address, O, WriteFn, Fields...>;
 };
+
+template <typename R> struct rt_offset_reg : R {
+    typename R::offset_t offset;
+};
+} // namespace detail
+
+template <stdx::ct_string Name, std::unsigned_integral T, auto Address,
+          write_function WriteFn = w::replace, fieldlike... Fields>
+using reg =
+    detail::ct_offset_reg<Name, T, Address, std::size_t{}, WriteFn, Fields...>;
 
 template <typename Reg> struct reg_with_value : Reg {
     typename Reg::type_t value;
 };
 
+template <typename R>
+constexpr auto get_address(R const &r) -> typename R::address_t {
+    return detail::maybe_invoke(R::address) + r.offset;
+}
+
 template <typename T>
-concept registerlike = fieldlike<T> and requires {
+concept registerlike = fieldlike<T> and requires(T t) {
     typename T::address_t;
-    { get_address<T>() } -> std::same_as<typename T::address_t>;
+    { get_address<T>(t) } -> std::same_as<typename T::address_t>;
+};
+
+template <registerlike R, typename R::offset_t N,
+          typename R::offset_t Stride = sizeof(typename R::type_t)>
+struct indexed_reg {
+    using offset_t = typename R::offset_t;
+
+    template <pathlike P> constexpr static auto resolve(P p) {
+        constexpr auto r = root(p);
+        constexpr auto leftover_path = without_root(p);
+
+        constexpr auto s = stdx::split<r, '['>();
+        if constexpr (s.first != R::name) {
+            return invalid_t{};
+        } else if constexpr (s.second.empty()) {
+            if constexpr (std::empty(leftover_path)) {
+                return indexed_reg{};
+            } else {
+                return invalid_t{};
+            }
+        } else {
+            constexpr auto i = stdx::split<s.second, ']'>();
+            if constexpr (not i.second.empty()) {
+                return invalid_t{};
+            } else {
+                constexpr auto n = [&]<offset_t... Is>(
+                                       std::integer_sequence<offset_t, Is...>) {
+                    return stdx::parse_literal<offset_t,
+                                               i.first.value[Is]...>();
+                }(std::make_integer_sequence<offset_t, std::size(i.first)>{});
+                if constexpr (n >= N) {
+                    return invalid_t{};
+                } else {
+                    constexpr auto new_path = path<s.first>{} / leftover_path;
+                    constexpr offset_t offset = n * Stride;
+                    return groov::resolve(
+                        typename R::template with_offset<offset>{}, new_path);
+                }
+            }
+        }
+    }
+
+    constexpr auto operator[](std::size_t n) const -> detail::rt_offset_reg<R> {
+        offset_t const offset = n * Stride;
+        return {{}, offset};
+    }
 };
 
 template <typename T, typename Reg>
 concept bus_for = requires(typename Reg::type_t data) {
     {
-        T::template read<Reg::name, typename Reg::type_t{}>(get_address<Reg>())
+        T::template read<Reg::name, typename Reg::type_t{}>(get_address(Reg{}))
     } -> async::sender;
     {
         T::template write<Reg::name, typename Reg::type_t{},
                           typename Reg::type_t{}, typename Reg::type_t{}>(
-            get_address<Reg>(), data)
+            get_address(Reg{}), data)
     } -> async::sender;
 };
 

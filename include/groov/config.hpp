@@ -7,9 +7,9 @@
 #include <async/concepts.hpp>
 
 #include <stdx/bit.hpp>
+#include <stdx/ct_format.hpp>
 #include <stdx/ct_string.hpp>
 #include <stdx/type_traits.hpp>
-#include <stdx/udls.hpp>
 #include <stdx/utility.hpp>
 
 #include <boost/mp11/algorithm.hpp>
@@ -139,24 +139,52 @@ struct field : named_container<Name, SubFields...> {
 };
 
 namespace detail {
+template <typename T>
+concept is_integral_constant = requires {
+    []<typename Int, Int I>(std::integral_constant<Int, I>) {}(T{});
+};
+
 template <typename T> constexpr auto maybe_invoke(T value) {
-    if constexpr (requires { value(); } and not requires { T::value; }) {
+    if constexpr (requires { value(); } and not is_integral_constant<T>) {
         return value();
     } else {
         return value;
     }
 }
-} // namespace detail
 
-namespace detail {
+template <stdx::ct_string Name> CONSTEVAL auto split_index() {
+    constexpr auto s = stdx::split<Name, '['>();
+    if constexpr (s.second.empty()) {
+        return std::pair{s.first, stdx::ct_string{""}};
+    } else {
+        constexpr auto i = stdx::split<s.second, ']'>();
+        static_assert(i.second.empty(), "Malformed index in path");
+        return std::pair{s.first, i.first};
+    }
+}
+
+template <stdx::ct_string Idx, typename T> CONSTEVAL auto extract_index() {
+    if constexpr (is_integral_constant<T>) {
+        using V = T::value_type;
+        return std::integral_constant<V, extract_index<Idx, V>()>{};
+    } else {
+        return [&]<T... Is>(std::integer_sequence<T, Is...>) {
+            return stdx::parse_literal<T, Idx.value[Is]...>();
+        }(std::make_integer_sequence<T, std::size(Idx)>{});
+    }
+}
+
 template <stdx::ct_string Name, std::unsigned_integral T, auto Address,
           auto Offset, write_function WriteFn = w::replace, fieldlike... Fields>
 struct ct_offset_reg : field<Name, T, std::numeric_limits<T>::digits - 1, 0u,
                              WriteFn, Fields...> {
-    using address_t = decltype(detail::maybe_invoke(Address));
+    using address_t = decltype(maybe_invoke(Address));
     constexpr static auto address = Address;
     using offset_t = decltype(Offset);
     constexpr static auto offset = Offset;
+
+    constexpr static auto indexed_name =
+        Name + +stdx::ct_format<"[{}]">(stdx::ct<Offset>());
 
     constexpr static auto children_mask =
         field<Name, T, std::numeric_limits<T>::digits - 1, 0u, WriteFn,
@@ -167,7 +195,7 @@ struct ct_offset_reg : field<Name, T, std::numeric_limits<T>::digits - 1, 0u,
             ? ct_offset_reg::template mask<T> & ~children_mask
             : T{};
     constexpr static auto unused_identity_value =
-        detail::compute_identity_value<WriteFn, T, unused_mask>();
+        compute_identity_value<WriteFn, T, unused_mask>();
 
     template <std::same_as<T> RegType>
     constexpr static auto extract(RegType value) {
@@ -180,7 +208,29 @@ struct ct_offset_reg : field<Name, T, std::numeric_limits<T>::digits - 1, 0u,
     }
 
     template <pathlike P> constexpr static auto resolve(P p) {
-        return detail::recursive_resolve<ct_offset_reg>(p);
+        constexpr auto r = root(p);
+        auto const leftover_path = without_root(p);
+
+        constexpr auto index_ok = []<stdx::ct_string S>() {
+            return detail::extract_index<S, offset_t>() == offset;
+        };
+
+        constexpr auto i = detail::split_index<r>();
+        if constexpr (i.first == Name) {
+            if constexpr (not i.second.empty() and
+                          not index_ok.template operator()<i.second>()) {
+                return invalid_t{};
+            } else if constexpr (leftover_path.empty()) {
+                return ct_offset_reg{};
+            } else {
+                return resolve(leftover_path);
+            }
+        } else {
+            using matches =
+                boost::mp11::mp_copy_if_q<typename ct_offset_reg::children_t,
+                                          resolves_q<P>>;
+            return resolve_matches<matches>(p);
+        }
     }
 
     template <auto O>
@@ -190,12 +240,40 @@ struct ct_offset_reg : field<Name, T, std::numeric_limits<T>::digits - 1, 0u,
 template <typename R> struct rt_offset_reg : R {
     typename R::offset_t offset;
 };
+
+template <typename T, T I>
+constexpr auto default_offset_for(std::integral_constant<T, I>) {
+    return std::integral_constant<T, T{}>{};
+}
+
+template <typename Addr> constexpr auto default_offset_for(Addr a) {
+    using R = decltype(maybe_invoke(a));
+    if constexpr (std::is_pointer_v<R>) {
+        return std::size_t{};
+    } else {
+        return R{};
+    }
+}
+
+template <typename A, typename O>
+constexpr auto add_offset(A addr, O offset)
+    requires requires { addr + offset; }
+{
+    return addr + offset;
+}
+
+template <typename T, T I, T J>
+constexpr auto add_offset(std::integral_constant<T, I>,
+                          std::integral_constant<T, J>) {
+    return std::integral_constant<T, I + J>{};
+}
 } // namespace detail
 
 template <stdx::ct_string Name, std::unsigned_integral T, auto Address,
           write_function WriteFn = w::replace, fieldlike... Fields>
 using reg =
-    detail::ct_offset_reg<Name, T, Address, std::size_t{}, WriteFn, Fields...>;
+    detail::ct_offset_reg<Name, T, Address, detail::default_offset_for(Address),
+                          WriteFn, Fields...>;
 
 template <typename Reg> struct reg_with_value : Reg {
     typename Reg::type_t value;
@@ -203,7 +281,7 @@ template <typename Reg> struct reg_with_value : Reg {
 
 template <typename R>
 constexpr auto get_address(R const &r) -> typename R::address_t {
-    return detail::maybe_invoke(R::address) + r.offset;
+    return detail::add_offset(detail::maybe_invoke(R::address), r.offset);
 }
 
 template <typename T>
@@ -213,7 +291,7 @@ concept registerlike = fieldlike<T> and requires(T t) {
 };
 
 template <registerlike R, typename R::offset_t N,
-          typename R::offset_t Stride = sizeof(typename R::type_t)>
+          typename R::offset_t Stride = 1>
 struct indexed_reg {
     using type_t = typename R::type_t;
     using address_t = typename R::address_t;
@@ -228,47 +306,38 @@ struct indexed_reg {
 
     template <pathlike P> constexpr static auto resolve(P p) {
         constexpr auto r = root(p);
-        constexpr auto leftover_path = without_root(p);
+        auto const leftover_path = without_root(p);
 
-        constexpr auto s = stdx::split<r, '['>();
-        if constexpr (s.first != R::name) {
+        constexpr auto i = detail::split_index<r>();
+        if constexpr (i.first != R::name) {
             return invalid_t{};
-        } else if constexpr (s.second.empty()) {
-            if constexpr (std::empty(leftover_path)) {
+        } else if constexpr (i.second.empty()) {
+            if constexpr (leftover_path.empty()) {
                 return indexed_reg{};
             } else {
                 return invalid_t{};
             }
         } else {
-            constexpr auto i = stdx::split<s.second, ']'>();
-            if constexpr (not i.second.empty()) {
+            constexpr auto n = detail::extract_index<i.second, offset_t>();
+            if constexpr (n >= N) {
                 return invalid_t{};
             } else {
-                constexpr auto n = [&]<offset_t... Is>(
-                                       std::integer_sequence<offset_t, Is...>) {
-                    return stdx::parse_literal<offset_t,
-                                               i.first.value[Is]...>();
-                }(std::make_integer_sequence<offset_t, std::size(i.first)>{});
-                if constexpr (n >= N) {
-                    return invalid_t{};
+                using child_t = boost::mp11::mp_at_c<children_t, n>;
+                if constexpr (std::empty(leftover_path)) {
+                    return child_t{};
                 } else {
-                    using child_t = boost::mp11::mp_at_c<children_t, n>;
-                    if constexpr (std::empty(leftover_path)) {
-                        return child_t{};
-                    } else {
-                        return groov::resolve(child_t{}, leftover_path);
-                    }
+                    return groov::resolve(child_t{}, leftover_path);
                 }
             }
         }
     }
 
-    constexpr auto operator[](std::size_t n) const {
+    constexpr auto operator[](offset_t n) const {
         offset_t const offset = n * Stride;
         return detail::rt_offset_reg<R>{{}, offset};
     }
 
-    template <typename T, auto I>
+    template <typename T, T I>
     constexpr auto operator[](std::integral_constant<T, I>) const {
         return boost::mp11::mp_at_c<children_t, I>{};
     }
@@ -299,24 +368,29 @@ struct group : named_container<Name, Registers...> {
         return make_spec(*this, ps...);
     }
 
+    constexpr auto operator()(registerlike auto const &...rs) const {
+        return make_spec(*this, rs...);
+    }
+
   private:
     friend constexpr auto operator/(group g, pathlike auto const &p) {
         return g(p);
     }
+    friend constexpr auto operator/(group g, registerlike auto const &r) {
+        return g(r);
+    }
 };
 
 namespace detail {
-template <typename L> struct any_resolves_q {
-    template <pathlike P> using fn = boost::mp11::mp_any_of_q<L, resolves_q<P>>;
+template <typename G> struct group_resolves_q {
+    template <pathlike P> using fn = is_resolvable_t<G, P>;
 };
 
 template <typename G, typename L> constexpr auto check_valid_config() -> void {
     static_assert(boost::mp11::mp_is_set<L>::value,
                   "Duplicate path passed to group");
-    static_assert(
-        boost::mp11::mp_all_of_q<L,
-                                 any_resolves_q<typename G::children_t>>::value,
-        "Unresolvable path passed to group");
+    static_assert(boost::mp11::mp_all_of_q<L, group_resolves_q<G>>::value,
+                  "Unresolvable path passed to group");
     stdx::template_for_each<L>([]<typename P>() {
         using rest = boost::mp11::mp_remove<L, P>;
         static_assert(boost::mp11::mp_none_of_q<rest, resolves_q<P>>::value,

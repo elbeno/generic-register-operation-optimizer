@@ -6,7 +6,13 @@
 
 #include <async/concepts.hpp>
 
+#include <stdx/udls.hpp>
+
 #include <catch2/catch_test_macros.hpp>
+
+#include <array>
+#include <cstdint>
+#include <type_traits>
 
 namespace {
 struct bus {
@@ -28,15 +34,20 @@ using F0 = groov::field<"field0", std::uint8_t, 0, 0>;
 using F1 = groov::field<"field1", std::uint8_t, 4, 1>;
 using F2 = groov::field<"field2", std::uint8_t, 7, 5>;
 
-std::uint32_t data0{};
+std::array<std::uint32_t, 4> data{};
 using R0 =
-    groov::reg<"reg0", std::uint32_t, &data0, groov::w::replace, F0, F1, F2>;
-std::uint32_t data1{};
+    groov::reg<"reg0", std::uint32_t, &data[0], groov::w::replace, F0, F1, F2>;
 using R1 =
-    groov::reg<"reg1", std::uint32_t, &data1, groov::w::replace, F0, F1, F2>;
+    groov::reg<"reg1", std::uint32_t, &data[1], groov::w::replace, F0, F1, F2>;
 
 using G = groov::group<"group", bus, R0, R1>;
 constexpr auto grp = G{};
+
+using RI =
+    groov::reg<"reg", std::uint32_t, &data[0], groov::w::replace, F0, F1, F2>;
+using Idx = groov::indexed_reg<RI, 4>;
+using GI = groov::group<"group", bus, Idx>;
+constexpr auto grpi = GI{};
 } // namespace
 
 TEST_CASE("flatten_paths (nothing to flatten)", "[write_spec]") {
@@ -47,7 +58,7 @@ TEST_CASE("flatten_paths (nothing to flatten)", "[write_spec]") {
     auto pp = groov::detail::flatten_paths(p);
 
     using R = std::remove_cvref_t<decltype(pp)>;
-    STATIC_REQUIRE(stdx::is_specialization_of_v<R, stdx::tuple>);
+    STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
 
     using P = stdx::tuple_element_t<0, R>;
     STATIC_CHECK(std::is_same_v<typename P::path_t, decltype("f"_f)>);
@@ -63,8 +74,8 @@ TEST_CASE("flatten_paths (single depth)", "[write_spec]") {
     auto pp = groov::detail::flatten_paths(p);
 
     using R = std::remove_cvref_t<decltype(pp)>;
-    STATIC_REQUIRE(stdx::is_specialization_of_v<R, stdx::tuple>);
-    STATIC_REQUIRE(stdx::tuple_size_v<R> == 1);
+    STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<R> == 1);
 
     using P = stdx::tuple_element_t<0, R>;
     STATIC_CHECK(std::is_same_v<typename P::path_t, decltype("r.f"_f)>);
@@ -80,8 +91,8 @@ TEST_CASE("flatten_paths (multi depth)", "[write_spec]") {
     auto pp = groov::detail::flatten_paths(p);
 
     using R = std::remove_cvref_t<decltype(pp)>;
-    STATIC_REQUIRE(stdx::is_specialization_of_v<R, stdx::tuple>);
-    STATIC_REQUIRE(stdx::tuple_size_v<R> == 1);
+    STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<R> == 1);
 
     using P = stdx::tuple_element_t<0, R>;
     STATIC_CHECK(std::is_same_v<typename P::path_t, decltype("r.f.subf"_f)>);
@@ -97,8 +108,8 @@ TEST_CASE("flatten_paths (multi value)", "[write_spec]") {
     auto pp = groov::detail::flatten_paths(p);
 
     using R = std::remove_cvref_t<decltype(pp)>;
-    STATIC_REQUIRE(stdx::is_specialization_of_v<R, stdx::tuple>);
-    STATIC_REQUIRE(stdx::tuple_size_v<R> == 2);
+    STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<R> == 2);
 
     using P1 = stdx::tuple_element_t<0, R>;
     STATIC_CHECK(std::is_same_v<typename P1::path_t, decltype("r.f0"_f)>);
@@ -119,8 +130,8 @@ TEST_CASE("flatten_paths (arbitrary)", "[write_spec]") {
     auto pp = groov::detail::flatten_paths(p);
 
     using R = std::remove_cvref_t<decltype(pp)>;
-    STATIC_REQUIRE(stdx::is_specialization_of_v<R, stdx::tuple>);
-    STATIC_REQUIRE(stdx::tuple_size_v<R> == 3);
+    STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<R> == 3);
 
     using P1 = stdx::tuple_element_t<0, R>;
     STATIC_CHECK(std::is_same_v<typename P1::path_t, decltype("r.f0"_f)>);
@@ -138,10 +149,19 @@ TEST_CASE("flatten_paths (arbitrary)", "[write_spec]") {
     CHECK(pp[2_idx].value == 7);
 }
 
-TEST_CASE("write_spec is made by combining group and paths", "[write_spec]") {
+TEST_CASE("write_spec is made by combining group and paths (non-indexed)",
+          "[write_spec]") {
     using namespace groov::literals;
     auto spec = grp("reg0"_r = 5);
-    STATIC_REQUIRE(
+    STATIC_CHECK(
+        stdx::is_specialization_of_v<decltype(spec), groov::write_spec>);
+}
+
+TEST_CASE("write_spec is made by combining group and paths (indexed)",
+          "[write_spec]") {
+    using namespace groov::literals;
+    auto spec = grpi("reg[1]"_r = 5);
+    STATIC_CHECK(
         stdx::is_specialization_of_v<decltype(spec), groov::write_spec>);
 }
 
@@ -149,7 +169,7 @@ TEST_CASE("valid paths are captured", "[write_spec]") {
     using namespace groov::literals;
     auto p = "reg0"_r = 5;
     auto spec = grp(p);
-    STATIC_REQUIRE(
+    STATIC_CHECK(
         std::is_same_v<decltype(spec)::paths_t,
                        boost::mp11::mp_list<typename decltype(p)::path_t>>);
 }
@@ -159,10 +179,9 @@ TEST_CASE("multiple paths can be passed (variadic)", "[write_spec]") {
     auto p = "reg0"_r = 5;
     auto q = "reg1"_r = 6;
     auto spec = grp(p, q);
-    STATIC_REQUIRE(
-        std::is_same_v<
-            decltype(spec)::paths_t,
-            boost::mp11::mp_list<decltype("reg0"_f), decltype("reg1"_f)>>);
+    STATIC_CHECK(std::is_same_v<
+                 decltype(spec)::paths_t,
+                 boost::mp11::mp_list<decltype("reg0"_f), decltype("reg1"_f)>>);
 }
 
 TEST_CASE("multiple paths can be passed (tree)", "[write_spec]") {
@@ -170,7 +189,7 @@ TEST_CASE("multiple paths can be passed (tree)", "[write_spec]") {
     auto p = "field0"_f = 5;
     auto q = "field1"_f = 6;
     auto spec = grp("reg0"_r(p, q));
-    STATIC_REQUIRE(
+    STATIC_CHECK(
         std::is_same_v<decltype(spec)::paths_t,
                        boost::mp11::mp_list<decltype("reg0.field0"_f),
                                             decltype("reg0.field1"_f)>>);
@@ -182,26 +201,55 @@ TEST_CASE("multiple paths can be passed (multi-tree)", "[write_spec]") {
     auto q = "field1"_f = 6;
 
     [[maybe_unused]] auto spec = grp("reg0"_r(p, q), "reg1"_r(p, q));
-    STATIC_REQUIRE(std::is_same_v<
-                   decltype(spec)::paths_t,
-                   boost::mp11::mp_list<
-                       decltype("reg0.field0"_f), decltype("reg0.field1"_f),
-                       decltype("reg1.field0"_f), decltype("reg1.field1"_f)>>);
+    STATIC_CHECK(std::is_same_v<
+                 decltype(spec)::paths_t,
+                 boost::mp11::mp_list<
+                     decltype("reg0.field0"_f), decltype("reg0.field1"_f),
+                     decltype("reg1.field0"_f), decltype("reg1.field1"_f)>>);
 }
 
 TEST_CASE("operator/ is overloaded to make write_spec", "[write_spec]") {
     using namespace groov::literals;
     auto p = "reg0"_r = 5;
     auto spec = grp / p;
-    STATIC_REQUIRE(
+    STATIC_CHECK(
         std::is_same_v<decltype(spec)::paths_t,
                        boost::mp11::mp_list<typename decltype(p)::path_t>>);
 }
 
-TEST_CASE("write spec can be indexed by path", "[write_spec]") {
+TEST_CASE("write spec can be indexed by path (non-indexed)", "[write_spec]") {
     using namespace groov::literals;
     auto const spec = grp("reg0"_r = 5);
     CHECK(spec["reg0"_r] == 5);
+}
+
+TEST_CASE("write spec can be indexed by path (indexed)", "[write_spec]") {
+    using namespace groov::literals;
+    auto const spec = grpi("reg[1]"_r = 5);
+    CHECK(spec["reg[1]"_r] == 5);
+}
+
+// TEST_CASE("write spec can be indexed by register (non-indexed)",
+//           "[write_spec]") {
+//     using namespace groov::literals;
+//     auto const spec = grp("reg0"_r = 5);
+//     CHECK(spec[R0{}] == 5);
+// }
+
+// TEST_CASE("write spec can be indexed by register (compile-time indexed)",
+//           "[write_spec]") {
+//     using namespace groov::literals;
+//     using namespace stdx::literals;
+//     auto const spec = grpi("reg[1]"_r = 5);
+//     CHECK(spec[Idx{}[1_c]] == 5);
+// }
+
+TEST_CASE("write spec can be indexed by register (runtime indexed)",
+          "[write_spec]") {
+    using namespace groov::literals;
+    using namespace stdx::literals;
+    auto const spec = grpi("reg[1]"_r = 5);
+    CHECK(spec[Idx{}[1]] == 5);
 }
 
 TEST_CASE("write spec specified with whole reg can be indexed by field",

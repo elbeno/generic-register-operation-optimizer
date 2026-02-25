@@ -224,6 +224,10 @@ struct write_spec : Group {
         return F::extract(r.value);
     }
 
+    template <registerlike R> constexpr auto operator[](R const &) const {
+        return (*this)[path<R::indexed_name>{}];
+    }
+
     template <std::size_t N>
     // NOLINTNEXTLINE(modernize-avoid-c-arrays)
     constexpr auto operator[](char const (&)[N]) const {

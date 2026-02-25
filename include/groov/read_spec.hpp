@@ -18,4 +18,10 @@ constexpr auto tag_invoke(make_spec_t, G, Ps...) {
     detail::check_valid_config<G, L>();
     return read_spec<G, L>{};
 }
+
+template <typename G, registerlike... Rs>
+    requires(... and not valued<Rs>)
+constexpr auto tag_invoke(make_spec_t, G, Rs...) {
+    return make_spec(G{}, path<Rs::indexed_name>{}...);
+}
 } // namespace groov

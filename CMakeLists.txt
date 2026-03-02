@@ -50,6 +50,7 @@ target_sources(
               include/groov/make_spec.hpp
               include/groov/mmio_bus.hpp
               include/groov/path.hpp
+              include/groov/path_element.hpp
               include/groov/read.hpp
               include/groov/read_spec.hpp
               include/groov/resolve.hpp

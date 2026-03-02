@@ -18,6 +18,7 @@ add_tests(
     identity
     mmio_bus
     path
+    path_element
     read
     read_spec
     test

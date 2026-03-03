@@ -1,10 +1,12 @@
 #pragma once
 
-#include <groov/attach_value.hpp>
+// #include <groov/attach_value.hpp>
+#include <groov/path_element.hpp>
 #include <groov/resolve.hpp>
 
 #include <stdx/compiler.hpp>
 #include <stdx/ct_string.hpp>
+#include <stdx/tuple.hpp>
 #include <stdx/type_traits.hpp>
 
 #include <boost/mp11/algorithm.hpp>
@@ -14,43 +16,45 @@
 #include <type_traits>
 
 namespace groov {
-template <stdx::ct_string... Parts> struct path {
-    template <typename... Vs> constexpr auto operator()(Vs const &...vs) const {
-        return attach_value(*this, vs...);
-    }
+template <path_elemental... Parts> struct path {
+    //   template <typename... Vs> constexpr auto operator()(Vs const &...vs)
+    //   const {
+    //       return attach_value(*this, vs...);
+    //   }
 
-    template <typename T>
-    // NOLINTNEXTLINE(misc-unconventional-assign-operator)
-    constexpr auto operator=(T const &value) const {
-        return (*this)(value);
-    }
+    //   template <typename T>
+    //   // NOLINTNEXTLINE(misc-unconventional-assign-operator)
+    //   constexpr auto operator=(T const &value) const {
+    //       return (*this)(value);
+    //   }
 
-    template <pathlike P> constexpr static auto resolve(P) {
-        constexpr auto len = sizeof...(Parts);
-        constexpr auto other_len = boost::mp11::mp_size<P>::value;
-        if constexpr (len >= other_len) {
-            constexpr auto valid =
-                std::same_as<boost::mp11::mp_take_c<path, other_len>,
-                             boost::mp11::mp_take_c<P, other_len>>;
-            if constexpr (valid) {
-                return boost::mp11::mp_drop_c<path, other_len>{};
-            } else {
-                return mismatch_t{};
-            }
-        } else {
-            return too_long_t{};
-        }
-    }
+    //   template <pathlike P> constexpr static auto resolve(P) {
+    //       constexpr auto len = sizeof...(Parts);
+    //       constexpr auto other_len = boost::mp11::mp_size<P>::value;
+    //       if constexpr (len >= other_len) {
+    //           constexpr auto valid =
+    //               std::same_as<boost::mp11::mp_take_c<path, other_len>,
+    //                            boost::mp11::mp_take_c<P, other_len>>;
+    //           if constexpr (valid) {
+    //               return boost::mp11::mp_drop_c<path, other_len>{};
+    //           } else {
+    //               return mismatch_t{};
+    //           }
+    //       } else {
+    //           return too_long_t{};
+    //       }
+    //   }
 
-    constexpr static auto without_root() {
-        if constexpr (sizeof...(Parts) > 0) {
-            return boost::mp11::mp_drop_c<path, 1>{};
-        } else {
-            return path<>{};
-        }
-    }
+    //   constexpr static auto without_root() {
+    //       if constexpr (sizeof...(Parts) > 0) {
+    //           return boost::mp11::mp_drop_c<path, 1>{};
+    //       } else {
+    //           return path<>{};
+    //       }
+    //   }
 
     constexpr static auto empty = std::bool_constant<sizeof...(Parts) == 0>{};
+    stdx::tuple<Parts...> value;
 
   private:
     friend constexpr auto operator==(path, path) -> bool = default;
@@ -58,29 +62,32 @@ template <stdx::ct_string... Parts> struct path {
     template <pathlike P>
         requires(not valued<P>)
     friend constexpr auto operator/(path, P p) {
-        return []<stdx::ct_string... As>(path<As...>) -> path<Parts..., As...> {
+        return []<path_elemental... As>(path<As...>) -> path<Parts..., As...> {
             return {};
         }(p);
     }
 };
 
-template <stdx::ct_string P, stdx::ct_string... Ps>
-constexpr auto parent(path<P, Ps...> const &) {
-    return boost::mp11::mp_take_c<path<P, Ps...>, sizeof...(Ps)>{};
-}
+template <typename... Ts> path(Ts...) -> path<Ts...>;
 
-constexpr inline auto parent(path<> const &) { return path<>{}; }
+// template <stdx::ct_string P, stdx::ct_string... Ps>
+// constexpr auto parent(path<P, Ps...> const &) {
+//     return boost::mp11::mp_take_c<path<P, Ps...>, sizeof...(Ps)>{};
+// }
 
-template <typename Path> using parent_t = decltype(parent(Path{}));
+// constexpr inline auto parent(path<> const &) { return path<>{}; }
 
-template <stdx::ct_string S, stdx::ct_string... Parts>
-CONSTEVAL auto make_path() -> pathlike auto {
+// template <typename Path> using parent_t = decltype(parent(Path{}));
+
+template <stdx::ct_string S, stdx::ct_string... Parts, path_elemental... Es>
+CONSTEVAL auto make_path(Es... es) -> pathlike auto {
     constexpr auto p = stdx::split<S, '.'>();
     if constexpr (p.second.empty()) {
         if constexpr (p.first.empty()) {
-            return path<>{};
+            return path{es...};
         } else {
-            return path<Parts..., p.first>{};
+            return path{ct_path_element<Parts>{}..., ct_path_element<p.first>{},
+                        es...};
         }
     } else {
         return make_path<p.second, Parts..., p.first>();
@@ -108,17 +115,17 @@ CONSTEVAL_UDL auto operator""_f() -> pathlike auto {
 }
 #else
 template <stdx::ct_string S>
-CONSTEVAL_UDL auto operator""_g() -> pathlike auto {
+CONSTEVAL_UDL auto operator""_g() -> /*pathlike*/ auto {
     return make_path<S>();
 }
 
 template <stdx::ct_string S>
-CONSTEVAL_UDL auto operator""_r() -> pathlike auto {
+CONSTEVAL_UDL auto operator""_r() -> /*pathlike*/ auto {
     return make_path<S>();
 }
 
 template <stdx::ct_string S>
-CONSTEVAL_UDL auto operator""_f() -> pathlike auto {
+CONSTEVAL_UDL auto operator""_f() -> /*pathlike*/ auto {
     return make_path<S>();
 }
 #endif

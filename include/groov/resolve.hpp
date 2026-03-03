@@ -1,5 +1,7 @@
 #pragma once
 
+#include <groov/path_element.hpp>
+
 #include <stdx/concepts.hpp>
 #include <stdx/ct_string.hpp>
 #include <stdx/type_traits.hpp>
@@ -8,12 +10,12 @@
 #include <utility>
 
 namespace groov {
-template <stdx::ct_string... Parts> struct path;
+template <path_elemental... Parts> struct path;
 
 template <typename T>
 concept pathlike = requires(T const &t) {
     {
-        []<stdx::ct_string... Parts>(path<Parts...> const &) {}(t)
+        []<path_elemental... Parts>(path<Parts...> const &) {}(t)
     } -> std::same_as<void>;
 };
 
@@ -24,7 +26,7 @@ template <typename T>
 concept valued_pathlike = pathlike<T> and valued<T>;
 
 namespace detail {
-template <stdx::ct_string... Parts>
+template <typename... Parts>
 constexpr auto get_path(path<Parts...> const &) -> path<Parts...>;
 }
 template <pathlike T>
@@ -88,14 +90,16 @@ template <typename T, typename... Args> struct resolve_result_q {
     template <pathlike P> using fn = resolve_t<T, P, Args...>;
 };
 
-template <stdx::ct_string P, stdx::ct_string... Ps>
-constexpr auto root(path<P, Ps...> const &) {
-    return P;
+template <path_elemental P, path_elemental... Ps>
+constexpr auto root(path<P, Ps...> const &) -> path_elemental auto {
+    return P{};
 }
 
-constexpr inline auto root(path<> const &) { return stdx::ct_string{""}; }
+constexpr inline auto root(path<> const &) -> path_elemental auto {
+    return ct_path_element<"">{};
+}
 
-template <pathlike P> constexpr auto without_root(P const &p) {
+template <pathlike P> constexpr auto without_root(P const &p) -> pathlike auto {
     return p.without_root();
 }
 } // namespace groov

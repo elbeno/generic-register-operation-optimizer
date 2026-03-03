@@ -2,6 +2,7 @@
 
 // #include <groov/attach_value.hpp>
 #include <groov/path_fwd.hpp>
+#include <groov/resolve.hpp>
 
 #include <stdx/compiler.hpp>
 #include <stdx/ct_string.hpp>
@@ -11,12 +12,21 @@
 #include <stdx/udls.hpp>
 
 #include <boost/mp11/algorithm.hpp>
-#include <boost/mp11/list.hpp>
 
-#include <concepts>
+#include <algorithm>
 #include <type_traits>
 
 namespace groov {
+template <pathlike T, pathlike U>
+constexpr auto equivalent(T const &t, U const &u) -> bool {
+    if constexpr (T::size() != U::size()) {
+        return false;
+    } else {
+        return stdx::all_of([](path_elemental auto const &x,
+                               path_elemental auto const &y) { return x == y; },
+                            t.value, u.value);
+    }
+}
 
 namespace detail {
 template <typename... Ts> constexpr auto path_build_helper(Ts &&...ts) {
@@ -25,6 +35,8 @@ template <typename... Ts> constexpr auto path_build_helper(Ts &&...ts) {
 } // namespace detail
 
 template <path_elemental... Elems> struct path {
+    constexpr static auto ct_usable = (... and Elems::ct_usable);
+
     //   template <typename... Vs> constexpr auto operator()(Vs const &...vs)
     //   const {
     //       return attach_value(*this, vs...);
@@ -36,50 +48,54 @@ template <path_elemental... Elems> struct path {
     //       return (*this)(value);
     //   }
 
-    //   template <pathlike P> constexpr static auto resolve(P) {
-    //       constexpr auto len = sizeof...(Parts);
-    //       constexpr auto other_len = boost::mp11::mp_size<P>::value;
-    //       if constexpr (len >= other_len) {
-    //           constexpr auto valid =
-    //               std::same_as<boost::mp11::mp_take_c<path, other_len>,
-    //                            boost::mp11::mp_take_c<P, other_len>>;
-    //           if constexpr (valid) {
-    //               return boost::mp11::mp_drop_c<path, other_len>{};
-    //           } else {
-    //               return mismatch_t{};
-    //           }
-    //       } else {
-    //           return too_long_t{};
-    //       }
-    //   }
+    template <pathlike P>
+        requires(P::ct_usable and ct_usable)
+    constexpr auto resolve(P) const {
+        if constexpr (size() >= P::size()) {
+            if constexpr (equivalent(P{}, path{}.take<P::size()>())) {
+                return drop<P::size()>();
+            } else {
+                return mismatch_t{};
+            }
+        } else {
+            return too_long_t{};
+        }
+    }
+
+    template <pathlike P>
+        requires(not P::ct_usable or not ct_usable)
+    constexpr auto resolve(P const &p) const -> resolution {
+        if constexpr (size() >= P::size()) {
+            return equivalent(p, take<P::size()>()) ? resolution::OK
+                                                    : resolution::MISMATCH;
+        } else {
+            return resolution::TOO_LONG;
+        }
+    }
 
     constexpr auto root() const {
-        static_assert(sizeof...(Elems) > 0,
-                      "Trying to call root() on an empty path");
+        static_assert(size() > 0, "Trying to call root() on an empty path");
         return stdx::get<0>(value);
     }
 
-    constexpr auto without_root() const {
-        if constexpr (empty) {
-            return path<>{};
-        } else {
-            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                return path<stdx::nth_t<Is + 1, Elems...>...>{
-                    stdx::get<Is + 1>(value)...};
-            }(std::make_index_sequence<sizeof...(Elems) - 1>{});
-        }
+    constexpr auto ct_prefix() const {
+        constexpr auto n = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            auto i = size();
+            auto const f = [&]<std::size_t I>() {
+                using E = stdx::nth_t<I, Elems...>;
+                if constexpr (not E::ct_usable) {
+                    i = I;
+                    return true;
+                }
+                return false;
+            };
+            (f.template operator()<Is>(), ...);
+            return i;
+        }(std::make_index_sequence<size()>{});
+        return take<n>();
     }
-
-    constexpr auto parent() const {
-        if constexpr (empty) {
-            return path<>{};
-        } else {
-            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                return path<stdx::nth_t<Is, Elems...>...>{
-                    stdx::get<Is>(value)...};
-            }(std::make_index_sequence<sizeof...(Elems) - 1>{});
-        }
-    }
+    constexpr auto without_root() const { return drop<1>(); }
+    constexpr auto parent() const { return take<size() - 1>(); }
 
     template <std::size_t N>
     constexpr auto operator[](std::integral_constant<std::size_t, N>) const {
@@ -90,11 +106,27 @@ template <path_elemental... Elems> struct path {
         return *this / rt_path_element{n};
     }
 
+    constexpr static auto size =
+        std::integral_constant<std::size_t, sizeof...(Elems)>{};
     constexpr static auto empty = std::bool_constant<sizeof...(Elems) == 0>{};
 
     stdx::tuple<Elems...> value;
 
   private:
+    template <std::size_t N> constexpr auto take() const {
+        constexpr auto n = std::min(N, size());
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return detail::path_build_helper(stdx::get<Is>(value)...);
+        }(std::make_index_sequence<n>{});
+    }
+
+    template <std::size_t N> constexpr auto drop() const {
+        constexpr auto n = std::min(N, size());
+        return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+            return detail::path_build_helper(stdx::get<Is + n>(value)...);
+        }(std::make_index_sequence<size() - n>{});
+    }
+
     friend constexpr auto operator==(path const &, path const &)
         -> bool = default;
 
@@ -111,7 +143,7 @@ template <path_elemental... Elems> struct path {
             return path<Elems..., std::remove_cvref_t<E>>{
                 stdx::get<Is>(std::forward<Self>(self).value)...,
                 std::forward<E>(e)};
-        }(std::make_index_sequence<sizeof...(Elems)>{});
+        }(std::make_index_sequence<size()>{});
     }
 
     template <path_elemental E, stdx::same_as_unqualified<path> Self>
@@ -120,7 +152,7 @@ template <path_elemental... Elems> struct path {
             return path<std::remove_cvref_t<E>, Elems...>{
                 std::forward<E>(e),
                 stdx::get<Is>(std::forward<Self>(self).value)...};
-        }(std::make_index_sequence<sizeof...(Elems)>{});
+        }(std::make_index_sequence<size()>{});
     }
 };
 
@@ -128,13 +160,6 @@ template <path_elemental T, path_elemental U>
 constexpr auto operator/(T &&t, U &&u) -> pathlike auto {
     return path<std::remove_cvref_t<T>, std::remove_cvref_t<U>>{
         std::forward<T>(t), std::forward<U>(u)};
-}
-
-template <pathlike T, pathlike U>
-constexpr auto equivalent(T const &t, U const &u) -> bool {
-    return stdx::all_of([](path_elemental auto const &x,
-                           path_elemental auto const &y) { return x == y; },
-                        t.value, u.value);
 }
 
 template <typename... Ts> path(Ts...) -> path<std::remove_cvref_t<Ts>...>;

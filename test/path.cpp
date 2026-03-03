@@ -9,6 +9,7 @@ TEST_CASE("register literal", "[path]") {
     constexpr auto r = "reg"_r;
     STATIC_CHECK(r == groov::path{"reg"_elem});
     STATIC_CHECK(sizeof(r) == 1);
+    STATIC_CHECK(std::size(r) == 1);
 }
 
 TEST_CASE("field literal", "[path]") {
@@ -23,6 +24,7 @@ TEST_CASE("dot-separated literal", "[path]") {
     constexpr auto f = "a.b.c.d"_f;
     STATIC_CHECK(f == groov::path{"a"_elem, "b"_elem, "c"_elem, "d"_elem});
     STATIC_CHECK(sizeof(f) == 1);
+    STATIC_CHECK(std::size(f) == 4);
 }
 
 TEST_CASE("empty literal", "[path]") {
@@ -107,48 +109,6 @@ TEST_CASE("RT path indexing", "[path]") {
     STATIC_CHECK(equivalent(p, "reg[1]"_f));
 }
 
-// TEST_CASE("path can resolve itself", "[path]") {
-//     using namespace groov::literals;
-//     constexpr auto p = "a"_r;
-//     STATIC_CHECK(groov::is_resolvable_v<decltype(p), decltype(p)>);
-// }
-
-// TEST_CASE("path resolves itself to empty path", "[path]") {
-//     using namespace groov::literals;
-//     constexpr auto p = "a"_r;
-//     constexpr auto r = groov::resolve(p, p);
-//     STATIC_CHECK(std::is_same_v<decltype(r), groov::path<> const>);
-// }
-
-// TEST_CASE("path resolves a shorter path", "[path]") {
-//     using namespace groov::literals;
-//     constexpr auto p = "a.b.c"_r;
-//     constexpr auto r1 = groov::resolve(p, "a"_r);
-//     STATIC_CHECK(r1 == "b.c"_r);
-//     constexpr auto r2 = groov::resolve(p, "a.b"_r);
-//     STATIC_CHECK(r2 == "c"_r);
-// }
-
-// TEST_CASE("path doesn't resolve a non-path", "[path]") {
-//     using namespace groov::literals;
-//     constexpr auto p = "a.b.c"_r;
-//     STATIC_CHECK(not groov::can_resolve<decltype(p), int>);
-// }
-
-// TEST_CASE("mismatched path gives invalid resolution", "[path]") {
-//     using namespace groov::literals;
-//     constexpr auto p = "a.b.c"_r;
-//     STATIC_CHECK(std::is_same_v<groov::mismatch_t,
-//                                 decltype(groov::resolve(p, "invalid"_r))>);
-// }
-
-// TEST_CASE("too-long path gives invalid resolution", "[path]") {
-//     using namespace groov::literals;
-//     constexpr auto p = "a.b"_r;
-//     STATIC_CHECK(std::is_same_v<groov::too_long_t,
-//                                 decltype(groov::resolve(p, "a.b.c"_r))>);
-// }
-
 TEST_CASE("root of a path", "[path]") {
     using namespace groov::literals;
     constexpr auto p = "a.b.c"_r;
@@ -209,4 +169,71 @@ TEST_CASE("path is pathlike", "[path]") {
     using namespace groov::literals;
     STATIC_CHECK(groov::pathlike<decltype("reg"_r / "field"_f)>);
     STATIC_CHECK(not groov::valued_pathlike<decltype("reg"_r / "field"_f)>);
+}
+
+TEST_CASE("path resolves itself to empty path (compile-time)", "[path]") {
+    using namespace groov::literals;
+    constexpr auto p = "a"_r;
+    constexpr auto r = groov::resolve(p, p);
+    STATIC_CHECK(r == ""_r);
+}
+
+TEST_CASE("path resolves a shorter path (compile-time)", "[path]") {
+    using namespace groov::literals;
+    constexpr auto p = "a.b.c"_r;
+    constexpr auto r1 = groov::resolve(p, "a"_r);
+    STATIC_CHECK(r1 == "b.c"_r);
+    constexpr auto r2 = groov::resolve(p, "a.b"_r);
+    STATIC_CHECK(r2 == "c"_r);
+}
+
+TEST_CASE("mismatched path gives invalid resolution (compile-time)", "[path]") {
+    using namespace groov::literals;
+    constexpr auto p = "a.b.c"_r;
+    STATIC_CHECK(std::is_same_v<groov::mismatch_t,
+                                decltype(groov::resolve(p, "invalid"_r))>);
+}
+
+TEST_CASE("too-long path gives invalid resolution (compile-time)", "[path]") {
+    using namespace groov::literals;
+    constexpr auto p = "a.b"_r;
+    STATIC_CHECK(std::is_same_v<groov::too_long_t,
+                                decltype(groov::resolve(p, "a.b.c"_r))>);
+}
+
+TEST_CASE("path resolves itself (runtime)", "[path]") {
+    using namespace groov::literals;
+    constexpr auto p = groov::path{groov::make_path_element("a")} / "b"_f;
+    constexpr auto r = groov::resolve(p, p);
+    STATIC_CHECK(r == groov::resolution::OK);
+}
+
+TEST_CASE("path resolves a shorter path (runtime)", "[path]") {
+    using namespace groov::literals;
+    constexpr auto p = groov::path{groov::make_path_element("a")} / "b.c"_r;
+    constexpr auto r1 = groov::resolve(p, "a"_r);
+    STATIC_CHECK(r1 == groov::resolution::OK);
+    constexpr auto r2 = groov::resolve(p, "a.b"_r);
+    STATIC_CHECK(r2 == groov::resolution::OK);
+}
+
+TEST_CASE("mismatched path gives invalid resolution (runtime)", "[path]") {
+    using namespace groov::literals;
+    constexpr auto p = groov::path{groov::make_path_element("a")} / "b.c"_r;
+    constexpr auto r = groov::resolve(p, "invalid"_r);
+    STATIC_CHECK(r == groov::resolution::MISMATCH);
+}
+
+TEST_CASE("too-long path gives invalid resolution (runtime)", "[path]") {
+    using namespace groov::literals;
+    constexpr auto p = groov::path{groov::make_path_element("a")} / "b"_r;
+    constexpr auto r = groov::resolve(p, "a.b.c"_r);
+    STATIC_CHECK(r == groov::resolution::TOO_LONG);
+}
+
+TEST_CASE("compile-time-usable prefix of a path", "[path]") {
+    using namespace groov::literals;
+    auto p = "a.b"_r / groov::make_path_element("c");
+    constexpr auto prefix = p.ct_prefix();
+    STATIC_CHECK(prefix == "a.b"_r);
 }

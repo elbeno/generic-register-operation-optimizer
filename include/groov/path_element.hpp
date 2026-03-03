@@ -3,6 +3,7 @@
 #include <stdx/compiler.hpp>
 #include <stdx/ct_string.hpp>
 #include <stdx/type_traits.hpp>
+#include <stdx/udls.hpp>
 
 #include <cstddef>
 #include <string_view>
@@ -32,9 +33,12 @@ template <typename X, typename Y>
 }
 } // namespace detail
 
-template <detail::path_element_helper V> struct ct_path_element {};
+template <detail::path_element_helper V> struct ct_path_element {
+    constexpr static auto ct_usable = true;
+};
 
 template <typename T> struct rt_path_element {
+    constexpr static auto ct_usable = false;
     T value{};
 };
 

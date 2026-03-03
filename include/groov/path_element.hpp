@@ -38,7 +38,8 @@ template <typename T> struct rt_path_element {
     T value{};
 };
 
-template <typename T> rt_path_element(T) -> rt_path_element<T>;
+template <typename T>
+rt_path_element(T) -> rt_path_element<std::remove_cvref_t<T>>;
 template <std::size_t N>
 rt_path_element(char const (&)[N]) -> rt_path_element<std::string_view>;
 
@@ -76,6 +77,37 @@ template <auto V, typename Y>
 
 template <typename T>
 concept path_elemental =
-    stdx::is_value_specialization_of_v<T, ct_path_element> or
-    stdx::is_type_specialization_of_v<T, rt_path_element>;
+    stdx::is_value_specialization_of_v<std::remove_cvref_t<T>,
+                                       ct_path_element> or
+    stdx::is_type_specialization_of_v<std::remove_cvref_t<T>, rt_path_element>;
+
+template <stdx::ct_string S> constexpr auto make_path_element() {
+    return ct_path_element<detail::path_element_helper{S}>{};
+}
+template <auto V>
+    requires(
+        not stdx::is_value_specialization_of_v<decltype(V), stdx::ct_string>)
+constexpr auto make_path_element() {
+    return ct_path_element<detail::path_element_helper{V}>{};
+}
+template <typename T> constexpr auto make_path_element(T &&t) {
+    return rt_path_element{std::forward<T>(t)};
+}
+
+namespace literals {
+#if __clang__ && __clang_major__ <= 14
+template <class T, T... chars> CONSTEVAL_UDL auto operator""_elem() {
+    constexpr auto s = stdx::ct_string<sizeof...(chars) + 1U>{{chars..., 0}};
+    return make_path_element<s>();
+}
+#else
+template <stdx::ct_string S> CONSTEVAL_UDL auto operator""_elem() {
+    return make_path_element<S>();
+}
+#endif
+
+template <char... Chars> CONSTEVAL_UDL auto operator""_elem() {
+    return make_path_element<stdx::parse_literal<std::size_t, Chars...>()>();
+}
+} // namespace literals
 } // namespace groov

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <groov/path_element.hpp>
+#include <groov/path_fwd.hpp>
 
 #include <stdx/concepts.hpp>
 #include <stdx/ct_string.hpp>
@@ -10,21 +10,6 @@
 #include <utility>
 
 namespace groov {
-template <path_elemental... Parts> struct path;
-
-template <typename T>
-concept pathlike = requires(T const &t) {
-    {
-        []<path_elemental... Parts>(path<Parts...> const &) {}(t)
-    } -> std::same_as<void>;
-};
-
-template <typename T>
-concept valued = requires { typename std::remove_cvref_t<T>::value_t; };
-
-template <typename T>
-concept valued_pathlike = pathlike<T> and valued<T>;
-
 namespace detail {
 template <typename... Parts>
 constexpr auto get_path(path<Parts...> const &) -> path<Parts...>;

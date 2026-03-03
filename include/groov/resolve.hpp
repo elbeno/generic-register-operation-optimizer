@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdx/concepts.hpp>
 #include <stdx/type_traits.hpp>
 
 #include <cstdint>
@@ -10,6 +11,9 @@ struct invalid_t {};
 struct too_long_t : invalid_t {};
 struct mismatch_t : invalid_t {};
 struct ambiguous_t : invalid_t {};
+
+template <typename T>
+concept valid_resolution = not(stdx::derived_from<T, invalid_t>);
 
 enum struct resolution : std::uint8_t {
     OK,
@@ -37,8 +41,8 @@ constexpr inline struct resolve_t {
     }
 } resolve{};
 
-// template <typename... Ts>
-// using resolve_t = decltype(resolve(std::declval<Ts>()...));
+template <typename... Ts>
+using resolution_t = decltype(resolve(std::declval<Ts>()...));
 
 // template <typename T, pathlike Path, typename... Args>
 // constexpr auto checked_resolve([[maybe_unused]] T const &t,
@@ -62,8 +66,8 @@ constexpr inline struct resolve_t {
 //     }
 // }
 
-// template <typename... Args>
-// concept can_resolve = not(stdx::derived_from<resolve_t<Args...>, invalid_t>);
+template <typename... Args>
+concept can_resolve = not(stdx::derived_from<resolution_t<Args...>, invalid_t>);
 
 // template <typename... Args>
 // constexpr static bool is_resolvable_v = can_resolve<Args...>;

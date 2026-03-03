@@ -1,6 +1,6 @@
 #pragma once
 
-// #include <groov/attach_value.hpp>
+#include <groov/attach_value.hpp>
 #include <groov/path_fwd.hpp>
 #include <groov/resolve.hpp>
 
@@ -10,8 +10,6 @@
 #include <stdx/tuple_algorithms.hpp>
 #include <stdx/type_traits.hpp>
 #include <stdx/udls.hpp>
-
-#include <boost/mp11/algorithm.hpp>
 
 #include <algorithm>
 #include <type_traits>
@@ -24,7 +22,7 @@ constexpr auto equivalent(T const &t, U const &u) -> bool {
     } else {
         return stdx::all_of([](path_elemental auto const &x,
                                path_elemental auto const &y) { return x == y; },
-                            t.value, u.value);
+                            t.elems, u.elems);
     }
 }
 
@@ -37,20 +35,19 @@ template <typename... Ts> constexpr auto path_build_helper(Ts &&...ts) {
 template <path_elemental... Elems> struct path {
     constexpr static auto ct_usable = (... and Elems::ct_usable);
 
-    //   template <typename... Vs> constexpr auto operator()(Vs const &...vs)
-    //   const {
-    //       return attach_value(*this, vs...);
-    //   }
+    template <typename... Vs> constexpr auto operator()(Vs const &...vs) const {
+        return attach_value(*this, vs...);
+    }
 
-    //   template <typename T>
-    //   // NOLINTNEXTLINE(misc-unconventional-assign-operator)
-    //   constexpr auto operator=(T const &value) const {
-    //       return (*this)(value);
-    //   }
+    template <typename T>
+    // NOLINTNEXTLINE(misc-unconventional-assign-operator)
+    constexpr auto operator=(T const &value) const {
+        return (*this)(value);
+    }
 
     template <pathlike P>
         requires(P::ct_usable and ct_usable)
-    constexpr auto resolve(P) const {
+    CONSTEVAL auto resolve(P) const {
         if constexpr (size() >= P::size()) {
             if constexpr (equivalent(P{}, path{}.take<P::size()>())) {
                 return drop<P::size()>();
@@ -75,10 +72,10 @@ template <path_elemental... Elems> struct path {
 
     constexpr auto root() const {
         static_assert(size() > 0, "Trying to call root() on an empty path");
-        return stdx::get<0>(value);
+        return get<0>(elems);
     }
 
-    constexpr auto ct_prefix() const {
+    CONSTEVAL auto ct_prefix() const {
         constexpr auto n = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
             auto i = size();
             auto const f = [&]<std::size_t I>() {
@@ -110,20 +107,20 @@ template <path_elemental... Elems> struct path {
         std::integral_constant<std::size_t, sizeof...(Elems)>{};
     constexpr static auto empty = std::bool_constant<sizeof...(Elems) == 0>{};
 
-    stdx::tuple<Elems...> value;
+    [[no_unique_address]] stdx::tuple<Elems...> elems;
 
   private:
     template <std::size_t N> constexpr auto take() const {
         constexpr auto n = std::min(N, size());
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            return detail::path_build_helper(stdx::get<Is>(value)...);
+            return detail::path_build_helper(stdx::get<Is>(elems)...);
         }(std::make_index_sequence<n>{});
     }
 
     template <std::size_t N> constexpr auto drop() const {
         constexpr auto n = std::min(N, size());
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-            return detail::path_build_helper(stdx::get<Is + n>(value)...);
+            return detail::path_build_helper(stdx::get<Is + n>(elems)...);
         }(std::make_index_sequence<size() - n>{});
     }
 
@@ -134,14 +131,14 @@ template <path_elemental... Elems> struct path {
         requires(not valued<P>)
     friend constexpr auto operator/(Self &&self, P &&p) -> pathlike auto {
         return detail::path_build_helper(stdx::tuple_cat(
-            std::forward<Self>(self).value, std::forward<P>(p).value));
+            std::forward<Self>(self).elems, std::forward<P>(p).elems));
     }
 
     template <stdx::same_as_unqualified<path> Self, path_elemental E>
     friend constexpr auto operator/(Self &&self, E &&e) -> pathlike auto {
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
             return path<Elems..., std::remove_cvref_t<E>>{
-                stdx::get<Is>(std::forward<Self>(self).value)...,
+                stdx::get<Is>(std::forward<Self>(self).elems)...,
                 std::forward<E>(e)};
         }(std::make_index_sequence<size()>{});
     }
@@ -151,7 +148,7 @@ template <path_elemental... Elems> struct path {
         return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
             return path<std::remove_cvref_t<E>, Elems...>{
                 std::forward<E>(e),
-                stdx::get<Is>(std::forward<Self>(self).value)...};
+                stdx::get<Is>(std::forward<Self>(self).elems)...};
         }(std::make_index_sequence<size()>{});
     }
 };

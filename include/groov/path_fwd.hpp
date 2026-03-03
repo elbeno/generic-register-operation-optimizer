@@ -15,6 +15,8 @@ concept pathlike = requires(T const &t) {
     } -> std::same_as<void>;
 };
 
+template <pathlike Path, typename Value> struct value_path;
+
 template <typename T>
 concept valued = requires { typename std::remove_cvref_t<T>::value_t; };
 

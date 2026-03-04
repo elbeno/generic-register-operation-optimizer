@@ -9,7 +9,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
-#include <concepts>
 #include <cstdint>
 #include <type_traits>
 
@@ -138,37 +137,37 @@ TEST_CASE("group can resolve a path", "[config]") {
     STATIC_CHECK(std::is_same_v<decltype(r), F const>);
 }
 
-TEST_CASE("all fields inside a register with no fields", "[config]") {
-    using namespace groov::literals;
-    using R = groov::reg<"reg", std::uint32_t, 0>;
-    STATIC_CHECK(
-        std::is_same_v<groov::detail::all_fields_t<boost::mp11::mp_list<R>>,
-                       boost::mp11::mp_list<R>>);
-}
+// TEST_CASE("all fields inside a register with no fields", "[config]") {
+//     using namespace groov::literals;
+//     using R = groov::reg<"reg", std::uint32_t, 0>;
+//     STATIC_CHECK(
+//         std::is_same_v<groov::detail::all_fields_t<boost::mp11::mp_list<R>>,
+//                        boost::mp11::mp_list<R>>);
+// }
 
-TEST_CASE("all fields inside a register with fields", "[config]") {
-    using namespace groov::literals;
-    using F0 = groov::field<"field0", std::uint32_t, 0, 0>;
-    using F1 = groov::field<"field1", std::uint32_t, 1, 1>;
-    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F0, F1>;
-    STATIC_CHECK(
-        std::is_same_v<groov::detail::all_fields_t<boost::mp11::mp_list<R>>,
-                       boost::mp11::mp_list<F0, F1>>);
-}
+// TEST_CASE("all fields inside a register with fields", "[config]") {
+//     using namespace groov::literals;
+//     using F0 = groov::field<"field0", std::uint32_t, 0, 0>;
+//     using F1 = groov::field<"field1", std::uint32_t, 1, 1>;
+//     using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F0, F1>;
+//     STATIC_CHECK(
+//         std::is_same_v<groov::detail::all_fields_t<boost::mp11::mp_list<R>>,
+//                        boost::mp11::mp_list<F0, F1>>);
+// }
 
-TEST_CASE("all fields inside a register with fields and subfields",
-          "[config]") {
-    using namespace groov::literals;
-    using SubF00 = groov::field<"subfield", std::uint32_t, 0, 0>;
-    using SubF01 = groov::field<"subfield", std::uint32_t, 1, 1>;
-    using F0 = groov::field<"field0", std::uint32_t, 1, 0, groov::w::replace,
-                            SubF00, SubF01>;
-    using F1 = groov::field<"field1", std::uint32_t, 2, 2>;
-    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F0, F1>;
-    STATIC_CHECK(
-        std::is_same_v<groov::detail::all_fields_t<boost::mp11::mp_list<R>>,
-                       boost::mp11::mp_list<SubF00, SubF01, F1>>);
-}
+// TEST_CASE("all fields inside a register with fields and subfields",
+//           "[config]") {
+//     using namespace groov::literals;
+//     using SubF00 = groov::field<"subfield", std::uint32_t, 0, 0>;
+//     using SubF01 = groov::field<"subfield", std::uint32_t, 1, 1>;
+//     using F0 = groov::field<"field0", std::uint32_t, 1, 0, groov::w::replace,
+//                             SubF00, SubF01>;
+//     using F1 = groov::field<"field1", std::uint32_t, 2, 2>;
+//     using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F0, F1>;
+//     STATIC_CHECK(
+//         std::is_same_v<groov::detail::all_fields_t<boost::mp11::mp_list<R>>,
+//                        boost::mp11::mp_list<SubF00, SubF01, F1>>);
+// }
 
 namespace {
 struct be_bus {

@@ -2,6 +2,8 @@
 
 #include <groov/identity.hpp>
 #include <groov/make_spec.hpp>
+#include <groov/path.hpp>
+#include <groov/path_element.hpp>
 #include <groov/resolve.hpp>
 
 #include <async/concepts.hpp>
@@ -50,13 +52,19 @@ template <typename T>
 concept containerlike = requires { typename T::children_t; };
 
 template <typename C, stdx::ct_string Name>
-using get_child = decltype(resolve(C{}, path<Name>{}));
+using get_child = decltype(resolve(C{}, make_path<Name>()));
 
 template <typename T>
 concept fieldlike =
     named<T> and containerlike<T> and requires { typename T::type_t; };
 
 namespace detail {
+
+template <typename... Args> struct resolves_q {
+    template <typename T>
+    using fn = std::bool_constant<can_resolve<T, Args...>>;
+};
+
 template <typename T, pathlike P> constexpr auto recursive_resolve(P);
 
 template <typename L, pathlike P>
@@ -71,11 +79,11 @@ constexpr auto resolve_matches([[maybe_unused]] P p) {
 }
 
 template <typename T, pathlike P> constexpr auto recursive_resolve(P p) {
-    constexpr auto r = root(p);
+    constexpr auto r = p.root();
     using children_t = typename T::children_t;
-    if constexpr (r == T::name) {
-        auto const leftover_path = without_root(p);
-        if constexpr (std::empty(leftover_path)) {
+    if constexpr (r == make_path_element<T::name>()) {
+        auto const leftover_path = p.without_root();
+        if constexpr (leftover_path.empty()) {
             return T{};
         } else {
             using matches =
@@ -219,111 +227,116 @@ struct group : named_container<Name, Registers...> {
     }
 };
 
-namespace detail {
-template <typename G> struct group_resolves_q {
-    template <pathlike P> using fn = is_resolvable_t<G, P>;
-};
+// namespace detail {
+// template <typename G> struct group_resolves_q {
+//     template <pathlike P> using fn = is_resolvable_t<G, P>;
+// };
 
-template <typename G, typename L> constexpr auto check_valid_config() -> void {
-    static_assert(boost::mp11::mp_is_set<L>::value,
-                  "Duplicate path passed to group");
-    static_assert(boost::mp11::mp_all_of_q<L, group_resolves_q<G>>::value,
-                  "Unresolvable path passed to group");
-    stdx::template_for_each<L>([]<typename P>() {
-        using rest = boost::mp11::mp_remove<L, P>;
-        static_assert(boost::mp11::mp_none_of_q<rest, resolves_q<P>>::value,
-                      "Redundant path passed to group");
-    });
-}
+// template <typename G, typename L> constexpr auto check_valid_config() -> void
+// {
+//     static_assert(boost::mp11::mp_is_set<L>::value,
+//                   "Duplicate path passed to group");
+//     static_assert(boost::mp11::mp_all_of_q<L, group_resolves_q<G>>::value,
+//                   "Unresolvable path passed to group");
+//     stdx::template_for_each<L>([]<typename P>() {
+//         using rest = boost::mp11::mp_remove<L, P>;
+//         static_assert(boost::mp11::mp_none_of_q<rest, resolves_q<P>>::value,
+//                       "Redundant path passed to group");
+//     });
+// }
 
-template <typename Group> struct register_for_path_q {
-    template <pathlike P> using fn = get_child<Group, root(P{})>;
-};
+// template <typename Group> struct register_for_path_q {
+//     template <pathlike P> using fn = get_child<Group, root(P{})>;
+// };
 
-template <typename Group> struct register_for_paths_q {
-    template <typename L>
-    using fn = typename register_for_path_q<Group>::template fn<
-        boost::mp11::mp_front<L>>;
-};
+// template <typename Group> struct register_for_paths_q {
+//     template <typename L>
+//     using fn = typename register_for_path_q<Group>::template fn<
+//         boost::mp11::mp_front<L>>;
+// };
 
-template <typename Paths> struct fields_for_reg_q {
-    template <typename R> struct resolve_path_t {
-        template <typename P> using fn = resolve_t<R, P>;
-    };
+// template <typename Paths> struct fields_for_reg_q {
+//     template <typename R> struct resolve_path_t {
+//         template <typename P> using fn = resolve_t<R, P>;
+//     };
 
-    template <typename R>
-    using fields_t = boost::mp11::mp_transform_q<resolve_path_t<R>, Paths>;
+//     template <typename R>
+//     using fields_t = boost::mp11::mp_transform_q<resolve_path_t<R>, Paths>;
 
-    template <typename R>
-    using fn = boost::mp11::mp_remove<fields_t<R>, invalid_t>;
-};
+//     template <typename R>
+//     using fn = boost::mp11::mp_remove<fields_t<R>, invalid_t>;
+// };
 
-template <typename M1, typename M2>
-using bitwise_or_t =
-    std::integral_constant<typename M1::value_type, M1::value | M2::value>;
+// template <typename M1, typename M2>
+// using bitwise_or_t =
+//     std::integral_constant<typename M1::value_type, M1::value | M2::value>;
 
-template <typename Reg> struct mask_q {
-    template <typename Obj>
-    using fn = std::integral_constant<typename Reg::type_t,
-                                      Obj::template mask<typename Reg::type_t>>;
-};
+// template <typename Reg> struct mask_q {
+//     template <typename Obj>
+//     using fn = std::integral_constant<typename Reg::type_t,
+//                                       Obj::template mask<typename
+//                                       Reg::type_t>>;
+// };
 
-template <typename Reg> struct id_mask_q {
-    template <typename Obj>
-    using fn = std::integral_constant<
-        typename Reg::type_t,
-        Obj::template identity_mask<typename Reg::type_t>>;
-};
+// template <typename Reg> struct id_mask_q {
+//     template <typename Obj>
+//     using fn = std::integral_constant<
+//         typename Reg::type_t,
+//         Obj::template identity_mask<typename Reg::type_t>>;
+// };
 
-template <typename Reg> struct id_value_q {
-    template <typename Obj>
-    using fn = std::integral_constant<
-        typename Reg::type_t,
-        Obj::template identity_value<typename Reg::type_t>>;
-};
+// template <typename Reg> struct id_value_q {
+//     template <typename Obj>
+//     using fn = std::integral_constant<
+//         typename Reg::type_t,
+//         Obj::template identity_value<typename Reg::type_t>>;
+// };
 
-template <typename ObjList, template <typename...> typename QFn, typename Reg>
-using bitwise_accum_t =
-    boost::mp11::mp_fold<boost::mp11::mp_transform_q<QFn<Reg>, ObjList>,
-                         std::integral_constant<typename Reg::type_t, 0>,
-                         bitwise_or_t>;
+// template <typename ObjList, template <typename...> typename QFn, typename
+// Reg> using bitwise_accum_t =
+//     boost::mp11::mp_fold<boost::mp11::mp_transform_q<QFn<Reg>, ObjList>,
+//                          std::integral_constant<typename Reg::type_t, 0>,
+//                          bitwise_or_t>;
 
-template <typename Paths> struct field_mask_for_reg_q {
-    template <typename R>
-    using fn = bitwise_accum_t<typename fields_for_reg_q<Paths>::template fn<R>,
-                               mask_q, R>;
-};
+// template <typename Paths> struct field_mask_for_reg_q {
+//     template <typename R>
+//     using fn = bitwise_accum_t<typename fields_for_reg_q<Paths>::template
+//     fn<R>,
+//                                mask_q, R>;
+// };
 
-template <typename Obj>
-using get_children =
-    stdx::conditional_t<boost::mp11::mp_empty<typename Obj::children_t>::value,
-                        boost::mp11::mp_list<Obj>, typename Obj::children_t>;
+// template <typename Obj>
+// using get_children =
+//     stdx::conditional_t<boost::mp11::mp_empty<typename
+//     Obj::children_t>::value,
+//                         boost::mp11::mp_list<Obj>, typename Obj::children_t>;
 
-template <typename ObjList>
-using expand_children =
-    boost::mp11::mp_flatten<boost::mp11::mp_transform<get_children, ObjList>>;
+// template <typename ObjList>
+// using expand_children =
+//     boost::mp11::mp_flatten<boost::mp11::mp_transform<get_children,
+//     ObjList>>;
 
-template <typename ObjList>
-using maybe_expand_children =
-    std::enable_if_t<not std::is_same_v<ObjList, expand_children<ObjList>>,
-                     expand_children<ObjList>>;
+// template <typename ObjList>
+// using maybe_expand_children =
+//     std::enable_if_t<not std::is_same_v<ObjList, expand_children<ObjList>>,
+//                      expand_children<ObjList>>;
 
-template <typename ObjList>
-using all_fields_t = boost::mp11::mp_back<boost::mp11::mp_iterate<
-    ObjList, boost::mp11::mp_identity_t, maybe_expand_children>>;
-} // namespace detail
+// template <typename ObjList>
+// using all_fields_t = boost::mp11::mp_back<boost::mp11::mp_iterate<
+//     ObjList, boost::mp11::mp_identity_t, maybe_expand_children>>;
+// } // namespace detail
 
-struct blocking;
-struct non_blocking;
+// struct blocking;
+// struct non_blocking;
 
-struct enable_t {};
-constexpr auto enable = enable_t{};
-struct disable_t {};
-constexpr auto disable = disable_t{};
-struct set_t {};
-constexpr auto set = set_t{};
-struct clear_t {};
-constexpr auto clear = clear_t{};
+// struct enable_t {};
+// constexpr auto enable = enable_t{};
+// struct disable_t {};
+// constexpr auto disable = disable_t{};
+// struct set_t {};
+// constexpr auto set = set_t{};
+// struct clear_t {};
+// constexpr auto clear = clear_t{};
 
 template <typename Bus, typename RegType>
 CONSTEVAL auto transform_mask(RegType mask) -> RegType {

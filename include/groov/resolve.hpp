@@ -1,5 +1,7 @@
 #pragma once
 
+#include <groov/path_fwd.hpp>
+
 #include <stdx/concepts.hpp>
 #include <stdx/type_traits.hpp>
 
@@ -44,30 +46,30 @@ constexpr inline struct resolve_t {
 template <typename... Ts>
 using resolution_t = decltype(resolve(std::declval<Ts>()...));
 
-// template <typename T, pathlike Path, typename... Args>
-// constexpr auto checked_resolve([[maybe_unused]] T const &t,
-//                                [[maybe_unused]] Path const &p,
-//                                Args const &...args) {
-//     using R = resolve_t<T, Path, Args...>;
-//     if constexpr (std::is_same_v<R, too_long_t>) {
-//         static_assert(
-//             stdx::always_false_v<T, Path, Args...>,
-//             "Attempting to access value with a path that is too long");
-//     } else if constexpr (std::is_same_v<R, mismatch_t>) {
-//         static_assert(stdx::always_false_v<T, Path, Args...>,
-//                       "Attempting to access value with a mismatched path");
-//     } else if constexpr (std::is_same_v<R, ambiguous_t>) {
-//         static_assert(stdx::always_false_v<T, Path, Args...>,
-//                       "Attempting to access value with an ambiguous path");
-//     } else {
-//         static_assert(not stdx::derived_from<R, invalid_t>,
-//                       "Attempting to access value with an invalid path");
-//         return t.resolve(p, args...);
-//     }
-// }
-
 template <typename... Args>
 concept can_resolve = not(stdx::derived_from<resolution_t<Args...>, invalid_t>);
+
+template <typename T, pathlike Path, typename... Args>
+constexpr auto checked_resolve([[maybe_unused]] T const &t,
+                               [[maybe_unused]] Path const &p,
+                               Args const &...args) {
+    using R = resolution_t<T, Path, Args...>;
+    if constexpr (std::is_same_v<R, too_long_t>) {
+        static_assert(
+            stdx::always_false_v<T, Path, Args...>,
+            "Attempting to access value with a path that is too long");
+    } else if constexpr (std::is_same_v<R, mismatch_t>) {
+        static_assert(stdx::always_false_v<T, Path, Args...>,
+                      "Attempting to access value with a mismatched path");
+    } else if constexpr (std::is_same_v<R, ambiguous_t>) {
+        static_assert(stdx::always_false_v<T, Path, Args...>,
+                      "Attempting to access value with an ambiguous path");
+    } else {
+        static_assert(not stdx::derived_from<R, invalid_t>,
+                      "Attempting to access value with an invalid path");
+        return t.resolve(p, args...);
+    }
+}
 
 // template <typename... Args>
 // constexpr static bool is_resolvable_v = can_resolve<Args...>;

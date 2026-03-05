@@ -1,7 +1,7 @@
 #pragma once
 
-#include <groov/config.hpp>
 #include <groov/make_spec.hpp>
+#include <groov/path_fwd.hpp>
 #include <groov/resolve.hpp>
 
 #include <boost/mp11/list.hpp>

@@ -59,12 +59,6 @@ concept fieldlike =
     named<T> and containerlike<T> and requires { typename T::type_t; };
 
 namespace detail {
-
-template <typename... Args> struct resolves_q {
-    template <typename T>
-    using fn = std::bool_constant<can_resolve<T, Args...>>;
-};
-
 template <typename T, pathlike P> constexpr auto recursive_resolve(P);
 
 template <typename L, pathlike P>
@@ -227,23 +221,18 @@ struct group : named_container<Name, Registers...> {
     }
 };
 
-// namespace detail {
-// template <typename G> struct group_resolves_q {
-//     template <pathlike P> using fn = is_resolvable_t<G, P>;
-// };
-
-// template <typename G, typename L> constexpr auto check_valid_config() -> void
-// {
-//     static_assert(boost::mp11::mp_is_set<L>::value,
-//                   "Duplicate path passed to group");
-//     static_assert(boost::mp11::mp_all_of_q<L, group_resolves_q<G>>::value,
-//                   "Unresolvable path passed to group");
-//     stdx::template_for_each<L>([]<typename P>() {
-//         using rest = boost::mp11::mp_remove<L, P>;
-//         static_assert(boost::mp11::mp_none_of_q<rest, resolves_q<P>>::value,
-//                       "Redundant path passed to group");
-//     });
-// }
+namespace detail {
+template <typename G, typename L> constexpr auto check_valid_config() -> void {
+    static_assert(boost::mp11::mp_is_set<L>::value,
+                  "Duplicate path passed to group");
+    static_assert(boost::mp11::mp_all_of_q<L, resolves_q<G>>::value,
+                  "Unresolvable path passed to group");
+    stdx::template_for_each<L>([]<typename P>() {
+        using rest = boost::mp11::mp_remove<L, P>;
+        static_assert(boost::mp11::mp_none_of_q<rest, resolves_q<P>>::value,
+                      "Redundant path passed to group");
+    });
+}
 
 // template <typename Group> struct register_for_path_q {
 //     template <pathlike P> using fn = get_child<Group, root(P{})>;
@@ -324,19 +313,19 @@ struct group : named_container<Name, Registers...> {
 // template <typename ObjList>
 // using all_fields_t = boost::mp11::mp_back<boost::mp11::mp_iterate<
 //     ObjList, boost::mp11::mp_identity_t, maybe_expand_children>>;
-// } // namespace detail
+} // namespace detail
 
-// struct blocking;
-// struct non_blocking;
+struct blocking;
+struct non_blocking;
 
-// struct enable_t {};
-// constexpr auto enable = enable_t{};
-// struct disable_t {};
-// constexpr auto disable = disable_t{};
-// struct set_t {};
-// constexpr auto set = set_t{};
-// struct clear_t {};
-// constexpr auto clear = clear_t{};
+struct enable_t {};
+constexpr auto enable = enable_t{};
+struct disable_t {};
+constexpr auto disable = disable_t{};
+struct set_t {};
+constexpr auto set = set_t{};
+struct clear_t {};
+constexpr auto clear = clear_t{};
 
 template <typename Bus, typename RegType>
 CONSTEVAL auto transform_mask(RegType mask) -> RegType {

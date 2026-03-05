@@ -49,6 +49,13 @@ using resolution_t = decltype(resolve(std::declval<Ts>()...));
 template <typename... Args>
 concept can_resolve = not(stdx::derived_from<resolution_t<Args...>, invalid_t>);
 
+namespace detail {
+template <typename... Args> struct resolves_q {
+    template <typename T>
+    using fn = std::bool_constant<can_resolve<T, Args...>>;
+};
+} // namespace detail
+
 template <typename T, pathlike Path, typename... Args>
 constexpr auto checked_resolve([[maybe_unused]] T const &t,
                                [[maybe_unused]] Path const &p,

@@ -16,6 +16,7 @@ template <typename... Ts> constexpr auto value_path_build_helper(Ts &&...ts) {
 } // namespace detail
 
 template <pathlike Path, typename Value> struct value_path : Path {
+    using path_t = Path;
     using value_t = Value;
     [[no_unique_address]] value_t value;
 
@@ -66,17 +67,17 @@ template <pathlike Path, typename Value> struct value_path : Path {
         return detail::value_path_build_helper(Path::without_root(), value);
     }
 
-    template <pathlike P> constexpr auto with_prepend() const {
-        return P{} / *this;
+    template <pathlike P> constexpr auto with_prepend(P &&p) const {
+        return std::forward<P>(p) / *this;
     }
 
     constexpr auto untuple() && {
-        detail::value_path_build_helper(static_cast<Path &&>(*this),
-                                        get<0>(std::move(value)));
+        return detail::value_path_build_helper(static_cast<Path &&>(*this),
+                                               get<0>(std::move(value)));
     }
     constexpr auto untuple() const & {
-        detail::value_path_build_helper(static_cast<Path const &>(*this),
-                                        get<0>(value));
+        return detail::value_path_build_helper(static_cast<Path const &>(*this),
+                                               get<0>(value));
     }
 
   private:

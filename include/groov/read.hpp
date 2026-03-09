@@ -34,28 +34,29 @@ auto read() -> async::sender auto {
         get_address<Register>());
 }
 
-template <typename Path> struct to_register;
+// template <typename Path> struct to_register;
 
-template <typename Group, typename Path>
-using to_register_t =
-    boost::mp11::mp_eval_if_c<registerlike<resolve_t<Group, Path>>,
-                              resolve_t<Group, Path>,
-                              to_register<parent_t<Path>>::template fn, Group>;
+// template <typename Group, typename Path>
+// using to_register_t =
+//     boost::mp11::mp_eval_if_c<registerlike<resolution_t<Group, Path>>,
+//                               resolution_t<Group, Path>,
+//                               to_register<parent_t<Path>>::template fn,
+//                               Group>;
 
-template <typename Path>
-    requires(Path::empty())
-struct to_register<Path> {
-    template <typename Group> using fn = void;
-};
-template <typename Path>
-    requires(not Path::empty())
-struct to_register<Path> {
-    template <typename Group> using fn = to_register_t<Group, Path>;
-};
+// template <typename Path>
+//     requires(Path::empty())
+// struct to_register<Path> {
+//     template <typename Group> using fn = void;
+// };
+// template <typename Path>
+//     requires(not Path::empty())
+// struct to_register<Path> {
+//     template <typename Group> using fn = to_register_t<Group, Path>;
+// };
 
-template <typename Group> struct to_register_q {
-    template <typename Path> using fn = to_register_t<Group, Path>;
-};
+// template <typename Group> struct to_register_q {
+//     template <typename Path> using fn = to_register_t<Group, Path>;
+// };
 
 template <typename Register> using to_fields = typename Register::children_t;
 

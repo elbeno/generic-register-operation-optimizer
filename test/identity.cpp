@@ -3,7 +3,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
-#include <limits>
 #include <type_traits>
 
 TEST_CASE("all specs fulfil mask_spec", "[identity]") {

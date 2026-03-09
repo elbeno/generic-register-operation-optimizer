@@ -50,93 +50,93 @@ TEST_CASE("flatten_paths (nothing to flatten)", "[write_spec]") {
     STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
 
     using P = stdx::tuple_element_t<0, R>;
-    STATIC_CHECK(std::is_same_v<typename P::path_t, decltype("f"_f)>);
     STATIC_CHECK(std::is_same_v<typename P::value_t, int>);
+    STATIC_CHECK(equivalent(pp[0_idx], "f"_f));
     CHECK(pp[0_idx].value == 5);
 }
 
-// TEST_CASE("flatten_paths (single depth)", "[write_spec]") {
-//     using namespace groov::literals;
-//     using namespace stdx::literals;
+TEST_CASE("flatten_paths (single depth)", "[write_spec]") {
+    using namespace groov::literals;
+    using namespace stdx::literals;
 
-//     auto p = "r"_r("f"_f = 5);
-//     auto pp = groov::detail::flatten_paths(p);
+    auto p = "r"_r("f"_f = 5);
+    auto pp = groov::detail::flatten_paths(p);
 
-//     using R = std::remove_cvref_t<decltype(pp)>;
-//     STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
-//     STATIC_CHECK(stdx::tuple_size_v<R> == 1);
+    using R = std::remove_cvref_t<decltype(pp)>;
+    STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<R> == 1);
 
-//     using P = stdx::tuple_element_t<0, R>;
-//     STATIC_CHECK(std::is_same_v<typename P::path_t, decltype("r.f"_f)>);
-//     STATIC_CHECK(std::is_same_v<typename P::value_t, int>);
-//     CHECK(pp[0_idx].value == 5);
-// }
+    using P = stdx::tuple_element_t<0, R>;
+    STATIC_CHECK(std::is_same_v<typename P::value_t, int>);
+    STATIC_CHECK(equivalent(pp[0_idx], "r.f"_f));
+    CHECK(pp[0_idx].value == 5);
+}
 
-// TEST_CASE("flatten_paths (multi depth)", "[write_spec]") {
-//     using namespace groov::literals;
-//     using namespace stdx::literals;
+TEST_CASE("flatten_paths (multi depth)", "[write_spec]") {
+    using namespace groov::literals;
+    using namespace stdx::literals;
 
-//     auto p = "r"_r("f"_f("subf"_f = 5));
-//     auto pp = groov::detail::flatten_paths(p);
+    auto p = "r"_r("f"_f("subf"_f = 5));
+    auto pp = groov::detail::flatten_paths(p);
 
-//     using R = std::remove_cvref_t<decltype(pp)>;
-//     STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
-//     STATIC_CHECK(stdx::tuple_size_v<R> == 1);
+    using R = std::remove_cvref_t<decltype(pp)>;
+    STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<R> == 1);
 
-//     using P = stdx::tuple_element_t<0, R>;
-//     STATIC_CHECK(std::is_same_v<typename P::path_t, decltype("r.f.subf"_f)>);
-//     STATIC_CHECK(std::is_same_v<typename P::value_t, int>);
-//     CHECK(pp[0_idx].value == 5);
-// }
+    using P = stdx::tuple_element_t<0, R>;
+    STATIC_CHECK(std::is_same_v<typename P::value_t, int>);
+    STATIC_CHECK(equivalent(pp[0_idx], "r.f.subf"_f));
+    CHECK(pp[0_idx].value == 5);
+}
 
-// TEST_CASE("flatten_paths (multi value)", "[write_spec]") {
-//     using namespace groov::literals;
-//     using namespace stdx::literals;
+TEST_CASE("flatten_paths (multi value)", "[write_spec]") {
+    using namespace groov::literals;
+    using namespace stdx::literals;
 
-//     auto p = "r"_r("f0"_f = 5, "f1"_f = 6);
-//     auto pp = groov::detail::flatten_paths(p);
+    auto p = "r"_r("f0"_f = 5, "f1"_f = 6);
+    auto pp = groov::detail::flatten_paths(p);
 
-//     using R = std::remove_cvref_t<decltype(pp)>;
-//     STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
-//     STATIC_CHECK(stdx::tuple_size_v<R> == 2);
+    using R = std::remove_cvref_t<decltype(pp)>;
+    STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<R> == 2);
 
-//     using P1 = stdx::tuple_element_t<0, R>;
-//     STATIC_CHECK(std::is_same_v<typename P1::path_t, decltype("r.f0"_f)>);
-//     STATIC_CHECK(std::is_same_v<typename P1::value_t, int>);
-//     CHECK(pp[0_idx].value == 5);
+    using P1 = stdx::tuple_element_t<0, R>;
+    STATIC_CHECK(std::is_same_v<typename P1::value_t, int>);
+    STATIC_CHECK(equivalent(pp[0_idx], "r.f0"_f));
+    CHECK(pp[0_idx].value == 5);
 
-//     using P2 = stdx::tuple_element_t<1, R>;
-//     STATIC_CHECK(std::is_same_v<typename P2::path_t, decltype("r.f1"_f)>);
-//     STATIC_CHECK(std::is_same_v<typename P2::value_t, int>);
-//     CHECK(pp[1_idx].value == 6);
-// }
+    using P2 = stdx::tuple_element_t<1, R>;
+    STATIC_CHECK(std::is_same_v<typename P2::value_t, int>);
+    STATIC_CHECK(equivalent(pp[1_idx], "r.f1"_f));
+    CHECK(pp[1_idx].value == 6);
+}
 
-// TEST_CASE("flatten_paths (arbitrary)", "[write_spec]") {
-//     using namespace groov::literals;
-//     using namespace stdx::literals;
+TEST_CASE("flatten_paths (arbitrary)", "[write_spec]") {
+    using namespace groov::literals;
+    using namespace stdx::literals;
 
-//     auto p = "r"_r("f0"_f = 5, "f1"_f("subf0"_f = 6, "subf1"_f = 7));
-//     auto pp = groov::detail::flatten_paths(p);
+    auto p = "r"_r("f0"_f = 5, "f1"_f("subf0"_f = 6, "subf1"_f = 7));
+    auto pp = groov::detail::flatten_paths(p);
 
-//     using R = std::remove_cvref_t<decltype(pp)>;
-//     STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
-//     STATIC_CHECK(stdx::tuple_size_v<R> == 3);
+    using R = std::remove_cvref_t<decltype(pp)>;
+    STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<R> == 3);
 
-//     using P1 = stdx::tuple_element_t<0, R>;
-//     STATIC_CHECK(std::is_same_v<typename P1::path_t, decltype("r.f0"_f)>);
-//     STATIC_CHECK(std::is_same_v<typename P1::value_t, int>);
-//     CHECK(pp[0_idx].value == 5);
+    using P1 = stdx::tuple_element_t<0, R>;
+    STATIC_CHECK(std::is_same_v<typename P1::value_t, int>);
+    STATIC_CHECK(equivalent(pp[0_idx], "r.f0"_f));
+    CHECK(pp[0_idx].value == 5);
 
-//     using P2 = stdx::tuple_element_t<1, R>;
-//     STATIC_CHECK(std::is_same_v<typename P2::path_t,
-//     decltype("r.f1.subf0"_f)>); STATIC_CHECK(std::is_same_v<typename
-//     P2::value_t, int>); CHECK(pp[1_idx].value == 6);
+    using P2 = stdx::tuple_element_t<1, R>;
+    STATIC_CHECK(std::is_same_v<typename P2::value_t, int>);
+    STATIC_CHECK(equivalent(pp[1_idx], "r.f1.subf0"_f));
+    CHECK(pp[1_idx].value == 6);
 
-//     using P3 = stdx::tuple_element_t<2, R>;
-//     STATIC_CHECK(std::is_same_v<typename P3::path_t,
-//     decltype("r.f1.subf1"_f)>); STATIC_CHECK(std::is_same_v<typename
-//     P3::value_t, int>); CHECK(pp[2_idx].value == 7);
-// }
+    using P3 = stdx::tuple_element_t<2, R>;
+    STATIC_CHECK(std::is_same_v<typename P3::value_t, int>);
+    STATIC_CHECK(equivalent(pp[2_idx], "r.f1.subf1"_f));
+    CHECK(pp[2_idx].value == 7);
+}
 
 // TEST_CASE("write_spec is made by combining group and paths", "[write_spec]")
 // {

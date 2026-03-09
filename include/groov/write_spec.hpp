@@ -14,6 +14,10 @@
 #include <boost/mp11/algorithm.hpp>
 #include <boost/mp11/list.hpp>
 
+#include <regex>
+
+template <typename...> struct undef;
+
 namespace groov {
 // namespace detail {
 // struct no_extract_type {};
@@ -282,11 +286,12 @@ namespace detail {
 template <valued_pathlike P> constexpr auto flatten_paths(P &&p) {
     using VP = std::remove_cvref_t<P>;
     using contained_value_t = stdx::tuple_element_t<0, typename VP::value_t>;
+    using path_t = typename VP::path_t;
 
     if constexpr (valued_pathlike<contained_value_t>) {
         return stdx::transform(
-            [](auto const &vp) {
-                return vp.template with_prepend<typename VP::path_t>();
+            [&](auto const &vp) {
+                return vp.with_prepend(static_cast<path_t const &>(p));
             },
             p.value.apply([]<typename... Ps>(Ps &&...ps) {
                 return stdx::tuple_cat(flatten_paths(std::forward<Ps>(ps))...);

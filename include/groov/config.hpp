@@ -222,7 +222,9 @@ struct group : named_container<Name, Registers...> {
 };
 
 namespace detail {
-template <typename G, typename L> constexpr auto check_valid_config() -> void {
+template <typename G, typename... Ps>
+constexpr auto check_valid_config(Ps const &...) -> void {
+    using L = boost::mp11::mp_list<Ps...>;
     static_assert(boost::mp11::mp_is_set<L>::value,
                   "Duplicate path passed to group");
     static_assert(boost::mp11::mp_all_of_q<L, resolves_q<G>>::value,

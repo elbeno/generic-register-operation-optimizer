@@ -33,6 +33,9 @@ template <typename... Ts> constexpr auto path_build_helper(Ts &&...ts) {
 } // namespace detail
 
 template <path_elemental... Elems> struct path {
+    using elems_t = stdx::tuple<Elems...>;
+    [[no_unique_address]] elems_t elems;
+
     constexpr static auto ct_usable = (... and Elems::ct_usable);
 
     template <typename... Vs> constexpr auto operator()(Vs const &...vs) const {
@@ -106,8 +109,6 @@ template <path_elemental... Elems> struct path {
     constexpr static auto size =
         std::integral_constant<std::size_t, sizeof...(Elems)>{};
     constexpr static auto empty = std::bool_constant<sizeof...(Elems) == 0>{};
-
-    [[no_unique_address]] stdx::tuple<Elems...> elems;
 
   private:
     template <std::size_t N> constexpr auto take() const {

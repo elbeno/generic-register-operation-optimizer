@@ -22,17 +22,8 @@ struct bus {
     }
 };
 
-using F0 = groov::field<"field0", std::uint8_t, 0, 0>;
-using F1 = groov::field<"field1", std::uint8_t, 4, 1>;
-using F2 = groov::field<"field2", std::uint8_t, 7, 5>;
-
-std::uint32_t data0{};
-using R0 =
-    groov::reg<"reg0", std::uint32_t, &data0, groov::w::replace, F0, F1, F2>;
-std::uint32_t data1{};
-using R1 =
-    groov::reg<"reg1", std::uint32_t, &data1, groov::w::replace, F0, F1, F2>;
-
+using R0 = groov::reg<"reg0", std::uint32_t, 0, groov::w::replace>;
+using R1 = groov::reg<"reg1", std::uint32_t, 1, groov::w::replace>;
 using G = groov::group<"group", bus, R0, R1>;
 constexpr auto grp = G{};
 } // namespace
@@ -82,4 +73,11 @@ TEST_CASE("operator/ is overloaded to make read_spec", "[read_spec]") {
     STATIC_CHECK(stdx::is_specialization_of_v<T, stdx::tuple>);
     STATIC_CHECK(stdx::tuple_size_v<T> == 1);
     STATIC_CHECK(equivalent(spec.paths[0_idx], "reg0"_r));
+}
+
+TEST_CASE("read_spec has no size when given compile-time paths",
+          "[read_spec]") {
+    using namespace groov::literals;
+    auto spec = grp("reg0"_r, "reg1"_r);
+    STATIC_CHECK(sizeof(spec) == 1);
 }

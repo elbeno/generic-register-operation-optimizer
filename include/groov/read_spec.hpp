@@ -8,18 +8,16 @@
 #include <stdx/tuple.hpp>
 
 namespace groov {
-template <typename Group, typename... Ps> struct read_spec : Group {
+template <typename Group, typename... Ps> struct read_spec {
+    using group_t = Group;
     using paths_t = stdx::tuple<Ps...>;
     [[no_unique_address]] paths_t paths;
 };
-template <typename... Ts>
-read_spec(Ts...) -> read_spec<std::remove_cvref_t<Ts>...>;
 
 template <typename G, pathlike... Ps>
     requires(... and not valued<Ps>)
-constexpr auto tag_invoke(make_spec_t, G g, Ps &&...ps) {
-    using T = stdx::tuple<std::remove_cvref_t<Ps>...>;
-    detail::check_valid_config<G, T>();
-    return read_spec{g, std::forward<Ps>(ps)...};
+constexpr auto tag_invoke(make_spec_t, G, Ps &&...ps) {
+    detail::check_valid_config<G>(ps...);
+    return read_spec<G, std::remove_cvref_t<Ps>...>{std::forward<Ps>(ps)...};
 }
 } // namespace groov

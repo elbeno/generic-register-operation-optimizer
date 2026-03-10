@@ -220,33 +220,32 @@ TEST_CASE("operator/ is overloaded to make write_spec", "[write_spec]") {
     STATIC_CHECK(equivalent(spec.paths[0_idx], "reg0"_f));
 }
 
-// TEST_CASE("write spec can be indexed by path", "[write_spec]") {
-//     using namespace groov::literals;
-//     auto const spec = grp("reg0"_r = 5);
-//     CHECK(spec["reg0"_r] == 5);
-// }
+TEST_CASE("write spec can be indexed by path", "[write_spec]") {
+    using namespace groov::literals;
+    auto const spec = grp("reg0"_r = 5);
+    CHECK(spec["reg0"_r] == 5);
+}
 
-// TEST_CASE("write spec specified with whole reg can be indexed by field",
-//           "[write_spec]") {
-//     using namespace groov::literals;
-//     auto spec = grp("reg0"_r = 5);
-//     CHECK(spec["reg0.field0"_f] == 1);
-// }
+TEST_CASE("write spec specified with whole reg can be indexed by field",
+          "[write_spec]") {
+    using namespace groov::literals;
+    auto spec = grp("reg0"_r = 5);
+    CHECK(spec["reg0.field0"_f] == 1);
+}
 
-// TEST_CASE("write spec allows lookup by unambiguous path", "[write_spec]") {
-//     using namespace groov::literals;
-//     auto spec = (grp("reg0.field1"_r = 0b1010u));
-//     CHECK(spec["field1"_f] == 0b1010u);
-// }
+TEST_CASE("write spec allows lookup by unambiguous path", "[write_spec]") {
+    using namespace groov::literals;
+    auto spec = (grp("reg0.field1"_r = 0b1010u));
+    CHECK(spec["field1"_f] == 0b1010u);
+}
 
-// TEST_CASE(
-//     "write spec specified with whole reg can be indexed by unambiguous
-//     field",
-//     "[write_spec]") {
-//     using namespace groov::literals;
-//     auto spec = grp("reg0"_r = 5);
-//     CHECK(spec["field0"_f] == 1);
-// }
+TEST_CASE(
+    "write spec specified with whole reg can be indexed by unambiguous field",
+    "[write_spec]") {
+    using namespace groov::literals;
+    auto spec = grp("reg0"_r = 5);
+    CHECK(spec["field0"_f] == 1);
+}
 
 // TEST_CASE("write spec with only one value implicitly converts",
 //           "[write_spec]") {

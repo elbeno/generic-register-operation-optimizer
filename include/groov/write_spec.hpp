@@ -191,34 +191,32 @@ template <typename Registers, pathlike... Ps> struct write_spec {
     //                            boost::mp11::mp_front<paths_t>>::type_t,
     //         detail::no_extract_type>;
 
-    //     template <pathlike P> constexpr static auto find_index() ->
-    //     std::size_t {
-    //         using actual_field_masks_t =
-    //             boost::mp11::mp_transform_q<detail::field_mask_for_reg_q<paths_t>,
-    //                                         value_t>;
-    //         using lookup_field_masks_t = boost::mp11::mp_transform_q<
-    //             detail::field_mask_for_reg_q<boost::mp11::mp_list<P>>,
-    //             value_t>;
-    //         using masks_t = boost::mp11::mp_transform<
-    //             detail::mask_overlap, actual_field_masks_t,
-    //             lookup_field_masks_t>;
-    //         using matches = boost::mp11::mp_copy_if<masks_t,
-    //         detail::nonzero_mask>; if constexpr
-    //         (boost::mp11::mp_empty<matches>::value) {
-    //             static_assert(stdx::always_false_v<P>,
-    //                           "Invalid path passed to write_spec[]");
-    //         } else if constexpr (boost::mp11::mp_size<matches>::value > 1) {
-    //             static_assert(stdx::always_false_v<P>,
-    //                           "Ambiguous path passed to write_spec[]");
-    //         } else {
-    //             using index_t =
-    //                 boost::mp11::mp_find_if<masks_t, detail::nonzero_mask>;
-    //             return index_t::value;
-    //         }
-    //         return {};
+    // template <pathlike P> constexpr static auto find_index() -> std::size_t {
+    //     using actual_field_masks_t =
+    //         boost::mp11::mp_transform_q<detail::field_mask_for_reg_q<paths_t>,
+    //                                     value_t>;
+    //     using lookup_field_masks_t = boost::mp11::mp_transform_q<
+    //         detail::field_mask_for_reg_q<boost::mp11::mp_list<P>>, value_t>;
+    //     using masks_t = boost::mp11::mp_transform<
+    //         detail::mask_overlap, actual_field_masks_t,
+    //         lookup_field_masks_t>;
+    //     using matches = boost::mp11::mp_copy_if<masks_t,
+    //     detail::nonzero_mask>; if constexpr
+    //     (boost::mp11::mp_empty<matches>::value) {
+    //         static_assert(stdx::always_false_v<P>,
+    //                       "Invalid path passed to write_spec[]");
+    //     } else if constexpr (boost::mp11::mp_size<matches>::value > 1) {
+    //         static_assert(stdx::always_false_v<P>,
+    //                       "Ambiguous path passed to write_spec[]");
+    //     } else {
+    //         using index_t =
+    //             boost::mp11::mp_find_if<masks_t, detail::nonzero_mask>;
+    //         return index_t::value;
     //     }
+    //     return {};
+    // }
 
-    //   public:
+  public:
     //     template <pathlike P> constexpr auto operator[](P const &)
     //     LIFETIMEBOUND
     //     {
@@ -228,13 +226,14 @@ template <typename Registers, pathlike... Ps> struct write_spec {
     //         return detail::field_proxy<R, resolve_t<R, P>>{r};
     //     }
 
-    //     template <pathlike P> constexpr auto operator[](P const &) const {
-    //         constexpr auto idx = find_index<P>();
-    //         auto &r = stdx::get<idx>(value);
-    //         using R = decltype(r);
-    //         using F = resolve_t<R, P>;
-    //         return F::extract(r.value);
-    //     }
+    template <pathlike P> constexpr auto operator[](P const &) const {
+        constexpr auto idx = 0; // find_index<P>();
+        using R = stdx::tuple_element_t<idx, Registers>;
+        using F = resolution_t<R, P>;
+
+        auto &v = stdx::get<idx>(values);
+        return F::extract(v);
+    }
 
     //     template <std::size_t N>
     //     // NOLINTNEXTLINE(modernize-avoid-c-arrays)

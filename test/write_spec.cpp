@@ -48,6 +48,7 @@ TEST_CASE("flatten_paths (nothing to flatten)", "[write_spec]") {
 
     using R = std::remove_cvref_t<decltype(pp)>;
     STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<R> == 1);
 
     using P = stdx::tuple_element_t<0, R>;
     STATIC_CHECK(std::is_same_v<typename P::value_t, int>);

@@ -47,7 +47,7 @@ template <path_elemental... Elems> struct path {
 
     template <pathlike P>
         requires(P::ct_usable and ct_usable)
-    CONSTEVAL auto resolve(P) const {
+    constexpr auto resolve(P) const {
         if constexpr (size() >= P::size()) {
             if constexpr (equivalent(P{}, path{}.take<P::size()>())) {
                 return drop<P::size()>();

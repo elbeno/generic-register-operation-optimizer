@@ -46,26 +46,40 @@ TEST_CASE("read_spec is made by combining group and paths", "[read_spec]") {
 
 TEST_CASE("valid paths are captured", "[read_spec]") {
     using namespace groov::literals;
+    using namespace stdx::literals;
+
     auto p = "reg0"_r;
     auto spec = grp(p);
-    STATIC_CHECK(std::is_same_v<decltype(spec)::paths_t,
-                                boost::mp11::mp_list<decltype(p)>>);
+
+    using T = decltype(spec)::paths_t;
+    STATIC_CHECK(stdx::is_specialization_of_v<T, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<T> == 1);
+    STATIC_CHECK(equivalent(spec.paths[0_idx], "reg0"_r));
 }
 
 TEST_CASE("multiple paths can be passed", "[read_spec]") {
     using namespace groov::literals;
+    using namespace stdx::literals;
+
     auto p = "reg0"_r;
     auto q = "reg1"_r;
     auto spec = grp(p, q);
-    STATIC_CHECK(
-        std::is_same_v<decltype(spec)::paths_t,
-                       boost::mp11::mp_list<decltype(p), decltype(q)>>);
+
+    using T = decltype(spec)::paths_t;
+    STATIC_CHECK(stdx::tuple_size_v<T> == 2);
+    STATIC_CHECK(equivalent(spec.paths[0_idx], "reg0"_r));
+    STATIC_CHECK(equivalent(spec.paths[1_idx], "reg1"_r));
 }
 
 TEST_CASE("operator/ is overloaded to make read_spec", "[read_spec]") {
     using namespace groov::literals;
+    using namespace stdx::literals;
+
     auto p = "reg0"_r;
     auto spec = grp / p;
-    STATIC_CHECK(std::is_same_v<decltype(spec)::paths_t,
-                                boost::mp11::mp_list<decltype(p)>>);
+
+    using T = decltype(spec)::paths_t;
+    STATIC_CHECK(stdx::is_specialization_of_v<T, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<T> == 1);
+    STATIC_CHECK(equivalent(spec.paths[0_idx], "reg0"_r));
 }

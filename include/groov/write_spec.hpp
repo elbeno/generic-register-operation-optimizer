@@ -19,59 +19,59 @@
 template <typename...> struct undef;
 
 namespace groov {
-// namespace detail {
+namespace detail {
 // struct no_extract_type {};
 
-// template <stdx::has_trait<std::is_enum> E>
-// constexpr static auto enable_value() {
-//     static_assert(stdx::always_false_v<E>,
-//                   "Enum doesn't contain an ENABLE value");
-// }
+template <stdx::has_trait<std::is_enum> E>
+constexpr static auto enable_value() {
+    static_assert(stdx::always_false_v<E>,
+                  "Enum doesn't contain an ENABLE value");
+}
 
-// template <stdx::has_trait<std::is_enum> E>
-//     requires requires { E::ENABLE; }
-// constexpr static auto enable_value() {
-//     return E::ENABLE;
-// }
+template <stdx::has_trait<std::is_enum> E>
+    requires requires { E::ENABLE; }
+constexpr static auto enable_value() {
+    return E::ENABLE;
+}
 
-// template <stdx::has_trait<std::is_enum> E>
-// constexpr static auto disable_value() {
-//     static_assert(stdx::always_false_v<E>,
-//                   "Enum doesn't contain an DISABLE value");
-// }
+template <stdx::has_trait<std::is_enum> E>
+constexpr static auto disable_value() {
+    static_assert(stdx::always_false_v<E>,
+                  "Enum doesn't contain an DISABLE value");
+}
 
-// template <stdx::has_trait<std::is_enum> E>
-//     requires requires { E::DISABLE; }
-// constexpr static auto disable_value() {
-//     return E::DISABLE;
-// }
+template <stdx::has_trait<std::is_enum> E>
+    requires requires { E::DISABLE; }
+constexpr static auto disable_value() {
+    return E::DISABLE;
+}
 
-// template <typename F, typename V> constexpr auto convert_value(V const &v) {
-//     using T = typename F::type_t;
-//     if constexpr (std::is_same_v<V, enable_t>) {
-//         static_assert(std::is_enum_v<T>,
-//                       "enable can only be used with enumeration fields that "
-//                       "contain an ENABLE value");
-//         return enable_value<T>();
-//     } else if constexpr (std::is_same_v<V, disable_t>) {
-//         static_assert(std::is_enum_v<T>,
-//                       "disable can only be used with enumeration fields that
-//                       " "contain a DISABLE value");
-//         return disable_value<T>();
-//     } else if constexpr (std::is_same_v<V, set_t>) {
-//         static_assert(set_write_function<typename F::write_fn_t>,
-//                       "set can only be used with fields that "
-//                       "have a set_spec in their write function");
-//         return F::write_fn_t::set_spec::template mask<F::field_mask>();
-//     } else if constexpr (std::is_same_v<V, clear_t>) {
-//         static_assert(clear_write_function<typename F::write_fn_t>,
-//                       "clear can only be used with fields that "
-//                       "have a clear_spec in their write function");
-//         return F::write_fn_t::clear_spec::template mask<F::field_mask>();
-//     } else {
-//         return static_cast<T>(v);
-//     }
-// }
+template <typename F, typename V> constexpr auto convert_value(V const &v) {
+    using T = typename F::type_t;
+    if constexpr (std::is_same_v<V, enable_t>) {
+        static_assert(std::is_enum_v<T>,
+                      "enable can only be used with enumeration fields that "
+                      "contain an ENABLE value");
+        return enable_value<T>();
+    } else if constexpr (std::is_same_v<V, disable_t>) {
+        static_assert(std::is_enum_v<T>,
+                      "disable can only be used with enumeration fields that "
+                      "contain a DISABLE value");
+        return disable_value<T>();
+    } else if constexpr (std::is_same_v<V, set_t>) {
+        static_assert(set_write_function<typename F::write_fn_t>,
+                      "set can only be used with fields that "
+                      "have a set_spec in their write function");
+        return F::write_fn_t::set_spec::template mask<F::field_mask>();
+    } else if constexpr (std::is_same_v<V, clear_t>) {
+        static_assert(clear_write_function<typename F::write_fn_t>,
+                      "clear can only be used with fields that "
+                      "have a clear_spec in their write function");
+        return F::write_fn_t::clear_spec::template mask<F::field_mask>();
+    } else {
+        return static_cast<T>(v);
+    }
+}
 
 // template <typename M1, typename M2>
 // using mask_overlap =
@@ -173,120 +173,134 @@ namespace groov {
 //     // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
 //     R &r;
 // };
-// } // namespace detail
+} // namespace detail
 
-// template <typename Group, typename Paths, typename Value>
-// struct write_spec : Group {
-//     using is_write_spec = void;
-//     using paths_t = Paths;
-//     using value_t = Value;
-//     [[no_unique_address]] value_t value;
+template <typename Registers, pathlike... Ps> struct write_spec {
+    using is_write_spec = void;
+    using registers_t = Registers;
+    using paths_t = stdx::tuple<Ps...>;
+    using values_t = boost::mp11::mp_transform<register_type_t, Registers>;
 
-//   private:
-//     using extract_type = stdx::conditional_t<
-//         boost::mp11::mp_size<paths_t>::value == 1,
-//         typename resolve_t<boost::mp11::mp_front<value_t>,
-//                            boost::mp11::mp_front<paths_t>>::type_t,
-//         detail::no_extract_type>;
+    [[no_unique_address]] paths_t paths;
+    [[no_unique_address]] values_t values{};
 
-//     template <pathlike P> constexpr static auto find_index() -> std::size_t {
-//         using actual_field_masks_t =
-//             boost::mp11::mp_transform_q<detail::field_mask_for_reg_q<paths_t>,
-//                                         value_t>;
-//         using lookup_field_masks_t = boost::mp11::mp_transform_q<
-//             detail::field_mask_for_reg_q<boost::mp11::mp_list<P>>, value_t>;
-//         using masks_t = boost::mp11::mp_transform<
-//             detail::mask_overlap, actual_field_masks_t,
-//             lookup_field_masks_t>;
-//         using matches = boost::mp11::mp_copy_if<masks_t,
-//         detail::nonzero_mask>; if constexpr
-//         (boost::mp11::mp_empty<matches>::value) {
-//             static_assert(stdx::always_false_v<P>,
-//                           "Invalid path passed to write_spec[]");
-//         } else if constexpr (boost::mp11::mp_size<matches>::value > 1) {
-//             static_assert(stdx::always_false_v<P>,
-//                           "Ambiguous path passed to write_spec[]");
-//         } else {
-//             using index_t =
-//                 boost::mp11::mp_find_if<masks_t, detail::nonzero_mask>;
-//             return index_t::value;
-//         }
-//         return {};
-//     }
+    //   private:
+    //     using extract_type = stdx::conditional_t<
+    //         boost::mp11::mp_size<paths_t>::value == 1,
+    //         typename resolve_t<boost::mp11::mp_front<value_t>,
+    //                            boost::mp11::mp_front<paths_t>>::type_t,
+    //         detail::no_extract_type>;
 
-//   public:
-//     template <pathlike P> constexpr auto operator[](P const &) LIFETIMEBOUND
-//     {
-//         constexpr auto idx = find_index<P>();
-//         auto &r = stdx::get<idx>(value);
-//         using R = decltype(r);
-//         return detail::field_proxy<R, resolve_t<R, P>>{r};
-//     }
+    //     template <pathlike P> constexpr static auto find_index() ->
+    //     std::size_t {
+    //         using actual_field_masks_t =
+    //             boost::mp11::mp_transform_q<detail::field_mask_for_reg_q<paths_t>,
+    //                                         value_t>;
+    //         using lookup_field_masks_t = boost::mp11::mp_transform_q<
+    //             detail::field_mask_for_reg_q<boost::mp11::mp_list<P>>,
+    //             value_t>;
+    //         using masks_t = boost::mp11::mp_transform<
+    //             detail::mask_overlap, actual_field_masks_t,
+    //             lookup_field_masks_t>;
+    //         using matches = boost::mp11::mp_copy_if<masks_t,
+    //         detail::nonzero_mask>; if constexpr
+    //         (boost::mp11::mp_empty<matches>::value) {
+    //             static_assert(stdx::always_false_v<P>,
+    //                           "Invalid path passed to write_spec[]");
+    //         } else if constexpr (boost::mp11::mp_size<matches>::value > 1) {
+    //             static_assert(stdx::always_false_v<P>,
+    //                           "Ambiguous path passed to write_spec[]");
+    //         } else {
+    //             using index_t =
+    //                 boost::mp11::mp_find_if<masks_t, detail::nonzero_mask>;
+    //             return index_t::value;
+    //         }
+    //         return {};
+    //     }
 
-//     template <pathlike P> constexpr auto operator[](P const &) const {
-//         constexpr auto idx = find_index<P>();
-//         auto &r = stdx::get<idx>(value);
-//         using R = decltype(r);
-//         using F = resolve_t<R, P>;
-//         return F::extract(r.value);
-//     }
+    //   public:
+    //     template <pathlike P> constexpr auto operator[](P const &)
+    //     LIFETIMEBOUND
+    //     {
+    //         constexpr auto idx = find_index<P>();
+    //         auto &r = stdx::get<idx>(value);
+    //         using R = decltype(r);
+    //         return detail::field_proxy<R, resolve_t<R, P>>{r};
+    //     }
 
-//     template <std::size_t N>
-//     // NOLINTNEXTLINE(modernize-avoid-c-arrays)
-//     constexpr auto operator[](char const (&)[N]) const {
-//         static_assert(stdx::always_false_v<write_spec>,
-//                       "Trying to index into a write_spec with a string "
-//                       "literal: did you forget to use the UDL?");
-//     }
+    //     template <pathlike P> constexpr auto operator[](P const &) const {
+    //         constexpr auto idx = find_index<P>();
+    //         auto &r = stdx::get<idx>(value);
+    //         using R = decltype(r);
+    //         using F = resolve_t<R, P>;
+    //         return F::extract(r.value);
+    //     }
 
-//     // NOLINTNEXTLINE(google-explicit-constructor)
-//     constexpr operator extract_type() const
-//         requires(not std::is_same_v<extract_type, detail::no_extract_type>)
-//     {
-//         using P = boost::mp11::mp_first<paths_t>;
-//         using R = boost::mp11::mp_first<value_t>;
-//         auto const &r = stdx::get<R>(value);
-//         using F = resolve_t<R, P>;
-//         return F::extract(r.value);
-//     }
-// };
+    //     template <std::size_t N>
+    //     // NOLINTNEXTLINE(modernize-avoid-c-arrays)
+    //     constexpr auto operator[](char const (&)[N]) const {
+    //         static_assert(stdx::always_false_v<write_spec>,
+    //                       "Trying to index into a write_spec with a string "
+    //                       "literal: did you forget to use the UDL?");
+    //     }
 
-template <typename Group, typename... Ps, valued_pathlike... VPs>
-constexpr auto to_write_spec(read_spec<Group, Ps...> &&rs, VPs const &...vps) {
-    // using paths_by_register =
-    //     boost::mpx::mp_gather_q<detail::register_for_path_q<Group>,
-    //                             boost::mp11::mp_list<Ps...>>;
-    undef<decltype(rs), decltype(vps)...> q{};
-    //     using registers =
-    //         boost::mp11::mp_transform_q<detail::register_for_paths_q<Group>,
-    //                                     paths_by_register>;
-    //     using register_values_t =
-    //         boost::mp11::mp_transform<reg_with_value, registers>;
-    //     using register_data_t =
-    //         boost::mp11::mp_apply<stdx::tuple, register_values_t>;
-
-    //     return [&]() -> write_spec<Group, Paths, register_data_t> {
-    //         auto w = write_spec<Group, Paths, register_data_t>{};
-    //         [[maybe_unused]] constexpr auto insert =
-    //             []<valued_pathlike P>(P const &p, [[maybe_unused]] auto
-    //             &values)
-    //             {
-    //                 using matches =
-    //                     boost::mp11::mp_copy_if_q<register_values_t,
-    //                     resolves_q<P>>;
-    //                 using R = boost::mp11::mp_first<matches>;
-    //                 auto &dest_reg = stdx::get<R>(values);
-    //                 using F = resolve_t<R, typename P::path_t>;
-
-    //                 F::insert(dest_reg.value,
-    //                 detail::convert_value<F>(p.value));
-    //             };
-    //         (insert(ps, w.value), ...);
-    //         return w;
-    //     }();
-}
+    //     // NOLINTNEXTLINE(google-explicit-constructor)
+    //     constexpr operator extract_type() const
+    //         requires(not std::is_same_v<extract_type,
+    //         detail::no_extract_type>)
+    //     {
+    //         using P = boost::mp11::mp_first<paths_t>;
+    //         using R = boost::mp11::mp_first<value_t>;
+    //         auto const &r = stdx::get<R>(value);
+    //         using F = resolve_t<R, P>;
+    //         return F::extract(r.value);
+    //     }
+};
 
 namespace detail {
+template <typename Group, valued_pathlike... VPs>
+constexpr auto unique_registers_for(VPs const &...vps) {
+    return stdx::transform(
+        []<typename T>(T &&t) { return get<0>(std::forward<T>(t)); },
+        stdx::gather(stdx::tuple{register_for_path<Group>(vps)...}));
+}
+
+template <typename R, valued_pathlike VP>
+constexpr auto try_insert([[maybe_unused]] auto &dest,
+                          [[maybe_unused]] VP const &vp) -> bool {
+    if constexpr (can_resolve<R, VP>) {
+        using F = resolution_t<R, VP>;
+        F::insert(dest, convert_value<F>(vp.value));
+        return true;
+    }
+    return false;
+}
+
+template <typename WS, valued_pathlike VP>
+constexpr auto insert(WS &ws, VP const &vp) {
+    auto inserted = false;
+    stdx::enumerate(
+        [&]<auto I>(auto &dest) {
+            using R = stdx::tuple_element_t<I, typename WS::registers_t>;
+            inserted = inserted or try_insert<R>(dest, vp);
+        },
+        ws.values);
+}
+
+template <typename Group, valued_pathlike... VPs>
+constexpr auto to_write_spec(VPs const &...vps)
+    -> write_spec<decltype(unique_registers_for<Group>(vps...)),
+                  typename VPs::path_t...> {
+    auto registers = stdx::transform(
+        []<typename T>(T &&t) { return get<0>(std::forward<T>(t)); },
+        stdx::gather(stdx::tuple{register_for_path<Group>(vps)...}));
+    using Rs = decltype(registers);
+
+    auto ws = write_spec<Rs, typename VPs::path_t...>{vps.as_path()...};
+    (insert(ws, vps), ...);
+    return ws;
+}
+
 template <valued_pathlike P> constexpr auto flatten_paths(P &&p) {
     using VP = std::remove_cvref_t<P>;
     using contained_value_t = stdx::tuple_element_t<0, typename VP::value_t>;
@@ -311,10 +325,7 @@ constexpr auto tag_invoke(make_spec_t, G, Ps &&...ps) {
     detail::check_valid_config<G>(ps...);
     return stdx::tuple_cat(detail::flatten_paths(std::forward<Ps>(ps))...)
         .apply([]<typename... VPs>(VPs &&...vps) {
-            return to_write_spec(
-                read_spec<G, typename std::remove_cvref_t<VPs>::path_t...>{
-                    std::forward<VPs>(vps)...},
-                std::forward<VPs>(vps)...);
+            return detail::to_write_spec<G>(std::forward<VPs>(vps)...);
         });
 }
 } // namespace groov

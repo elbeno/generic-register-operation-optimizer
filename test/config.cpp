@@ -137,6 +137,15 @@ TEST_CASE("group can resolve a path", "[config]") {
     STATIC_CHECK(std::is_same_v<decltype(r), F const>);
 }
 
+TEST_CASE("get the register for a path", "[config]") {
+    using namespace groov::literals;
+    using F = groov::field<"field", std::uint32_t, 0, 0>;
+    using R = groov::reg<"reg", std::uint32_t, 0, groov::w::replace, F>;
+    using G = groov::group<"group", bus, R>;
+    constexpr auto r = groov::register_for_path<G>("reg.field"_f);
+    STATIC_CHECK(std::is_same_v<decltype(r), R const>);
+}
+
 // TEST_CASE("all fields inside a register with no fields", "[config]") {
 //     using namespace groov::literals;
 //     using R = groov::reg<"reg", std::uint32_t, 0>;

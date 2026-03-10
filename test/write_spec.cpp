@@ -140,65 +140,85 @@ TEST_CASE("flatten_paths (arbitrary)", "[write_spec]") {
 }
 
 TEST_CASE("write_spec is made by combining group and paths", "[write_spec]") {
-    [[maybe_unused]] auto x = grp;
-    // using namespace groov::literals;
-    // auto spec = grp("reg0"_r = 5);
-    // STATIC_CHECK(
-    //     stdx::is_specialization_of_v<decltype(spec), groov::write_spec>);
+    using namespace groov::literals;
+    auto spec = grp("reg0"_r = 5);
+    STATIC_CHECK(
+        stdx::is_specialization_of_v<decltype(spec), groov::write_spec>);
 }
 
-// TEST_CASE("valid paths are captured", "[write_spec]") {
-//     using namespace groov::literals;
-//     auto p = "reg0"_r = 5;
-//     auto spec = grp(p);
-//     STATIC_CHECK(
-//         std::is_same_v<decltype(spec)::paths_t,
-//                        boost::mp11::mp_list<typename decltype(p)::path_t>>);
-// }
+TEST_CASE("valid paths are captured", "[write_spec]") {
+    using namespace groov::literals;
+    auto p = "reg0"_r = 5;
+    auto spec = grp(p);
 
-// TEST_CASE("multiple paths can be passed (variadic)", "[write_spec]") {
-//     using namespace groov::literals;
-//     auto p = "reg0"_r = 5;
-//     auto q = "reg1"_r = 6;
-//     auto spec = grp(p, q);
-//     STATIC_CHECK(std::is_same_v<
-//                  decltype(spec)::paths_t,
-//                  boost::mp11::mp_list<decltype("reg0"_f),
-//                  decltype("reg1"_f)>>);
-// }
+    using P = typename decltype(spec)::paths_t;
+    STATIC_CHECK(stdx::is_specialization_of_v<P, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<P> == 1);
+    STATIC_CHECK(equivalent(spec.paths[0_idx], "reg0"_f));
+}
 
-// TEST_CASE("multiple paths can be passed (tree)", "[write_spec]") {
-//     using namespace groov::literals;
-//     auto p = "field0"_f = 5;
-//     auto q = "field1"_f = 6;
-//     auto spec = grp("reg0"_r(p, q));
-//     STATIC_CHECK(
-//         std::is_same_v<decltype(spec)::paths_t,
-//                        boost::mp11::mp_list<decltype("reg0.field0"_f),
-//                                             decltype("reg0.field1"_f)>>);
-// }
+TEST_CASE("values are captured", "[write_spec]") {
+    using namespace groov::literals;
+    auto p = "reg0"_r = 5;
+    auto spec = grp(p);
 
-// TEST_CASE("multiple paths can be passed (multi-tree)", "[write_spec]") {
-//     using namespace groov::literals;
-//     auto p = "field0"_f = 5;
-//     auto q = "field1"_f = 6;
+    using V = typename decltype(spec)::values_t;
+    STATIC_CHECK(stdx::is_specialization_of_v<V, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<V> == 1);
+    CHECK(spec.values[0_idx] == 5);
+}
 
-//     [[maybe_unused]] auto spec = grp("reg0"_r(p, q), "reg1"_r(p, q));
-//     STATIC_CHECK(std::is_same_v<
-//                  decltype(spec)::paths_t,
-//                  boost::mp11::mp_list<
-//                      decltype("reg0.field0"_f), decltype("reg0.field1"_f),
-//                      decltype("reg1.field0"_f), decltype("reg1.field1"_f)>>);
-// }
+TEST_CASE("multiple paths can be passed (variadic)", "[write_spec]") {
+    using namespace groov::literals;
+    auto p = "reg0"_r = 5;
+    auto q = "reg1"_r = 6;
+    auto spec = grp(p, q);
 
-// TEST_CASE("operator/ is overloaded to make write_spec", "[write_spec]") {
-//     using namespace groov::literals;
-//     auto p = "reg0"_r = 5;
-//     auto spec = grp / p;
-//     STATIC_CHECK(
-//         std::is_same_v<decltype(spec)::paths_t,
-//                        boost::mp11::mp_list<typename decltype(p)::path_t>>);
-// }
+    using P = typename decltype(spec)::paths_t;
+    STATIC_CHECK(stdx::is_specialization_of_v<P, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<P> == 2);
+    STATIC_CHECK(equivalent(spec.paths[0_idx], "reg0"_f));
+    STATIC_CHECK(equivalent(spec.paths[1_idx], "reg1"_f));
+}
+
+TEST_CASE("multiple paths can be passed (tree)", "[write_spec]") {
+    using namespace groov::literals;
+    auto p = "field0"_f = 5;
+    auto q = "field1"_f = 6;
+    auto spec = grp("reg0"_r(p, q));
+
+    using P = typename decltype(spec)::paths_t;
+    STATIC_CHECK(stdx::is_specialization_of_v<P, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<P> == 2);
+    STATIC_CHECK(equivalent(spec.paths[0_idx], "reg0.field0"_f));
+    STATIC_CHECK(equivalent(spec.paths[1_idx], "reg0.field1"_f));
+}
+
+TEST_CASE("multiple paths can be passed (multi-tree)", "[write_spec]") {
+    using namespace groov::literals;
+    auto p = "field0"_f = 5;
+    auto q = "field1"_f = 6;
+    auto spec = grp("reg0"_r(p, q), "reg1"_r(p, q));
+
+    using P = typename decltype(spec)::paths_t;
+    STATIC_CHECK(stdx::is_specialization_of_v<P, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<P> == 4);
+    STATIC_CHECK(equivalent(spec.paths[0_idx], "reg0.field0"_f));
+    STATIC_CHECK(equivalent(spec.paths[1_idx], "reg0.field1"_f));
+    STATIC_CHECK(equivalent(spec.paths[2_idx], "reg1.field0"_f));
+    STATIC_CHECK(equivalent(spec.paths[3_idx], "reg1.field1"_f));
+}
+
+TEST_CASE("operator/ is overloaded to make write_spec", "[write_spec]") {
+    using namespace groov::literals;
+    auto p = "reg0"_r = 5;
+    auto spec = grp / p;
+
+    using P = typename decltype(spec)::paths_t;
+    STATIC_CHECK(stdx::is_specialization_of_v<P, stdx::tuple>);
+    STATIC_CHECK(stdx::tuple_size_v<P> == 1);
+    STATIC_CHECK(equivalent(spec.paths[0_idx], "reg0"_f));
+}
 
 // TEST_CASE("write spec can be indexed by path", "[write_spec]") {
 //     using namespace groov::literals;

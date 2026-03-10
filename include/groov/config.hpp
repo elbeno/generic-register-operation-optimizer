@@ -180,15 +180,13 @@ struct reg : field<Name, T, std::numeric_limits<T>::digits - 1, 0u, WriteFn,
     }
 };
 
-template <typename Reg> struct reg_with_value : Reg {
-    typename Reg::type_t value;
-};
-
 template <typename T>
 concept registerlike = fieldlike<T> and requires {
     typename T::address_t;
     { get_address<T>() } -> std::same_as<typename T::address_t>;
 };
+
+template <registerlike R> using register_type_t = typename R::type_t;
 
 template <typename T, typename Reg>
 concept bus_for = requires(typename Reg::type_t data) {
@@ -221,8 +219,18 @@ struct group : named_container<Name, Registers...> {
     }
 };
 
+template <typename Group, pathlike P>
+constexpr auto register_for_path(P const &p) {
+    static_assert(not p.empty());
+    if constexpr (registerlike<decltype(resolve(Group{}, p))>) {
+        return resolve(Group{}, p);
+    } else {
+        return register_for_path<Group>(p.parent());
+    }
+}
+
 namespace detail {
-template <typename G, typename... Ps>
+template <typename G, pathlike... Ps>
 constexpr auto check_valid_config(Ps const &...) -> void {
     using L = boost::mp11::mp_list<Ps...>;
     static_assert(boost::mp11::mp_is_set<L>::value,

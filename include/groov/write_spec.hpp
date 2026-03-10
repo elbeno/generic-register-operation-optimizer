@@ -251,36 +251,40 @@ namespace groov {
 //     }
 // };
 
-// template <typename Group, typename Paths, valued_pathlike... Ps>
-// constexpr auto to_write_spec(read_spec<Group, Paths>, Ps const &...ps) {
-//     using paths_by_register =
-//         boost::mpx::mp_gather_q<detail::register_for_path_q<Group>, Paths>;
-//     using registers =
-//         boost::mp11::mp_transform_q<detail::register_for_paths_q<Group>,
-//                                     paths_by_register>;
-//     using register_values_t =
-//         boost::mp11::mp_transform<reg_with_value, registers>;
-//     using register_data_t =
-//         boost::mp11::mp_apply<stdx::tuple, register_values_t>;
+template <typename Group, typename... Ps, valued_pathlike... VPs>
+constexpr auto to_write_spec(read_spec<Group, Ps...> &&rs, VPs const &...vps) {
+    // using paths_by_register =
+    //     boost::mpx::mp_gather_q<detail::register_for_path_q<Group>,
+    //                             boost::mp11::mp_list<Ps...>>;
+    undef<decltype(rs), decltype(vps)...> q{};
+    //     using registers =
+    //         boost::mp11::mp_transform_q<detail::register_for_paths_q<Group>,
+    //                                     paths_by_register>;
+    //     using register_values_t =
+    //         boost::mp11::mp_transform<reg_with_value, registers>;
+    //     using register_data_t =
+    //         boost::mp11::mp_apply<stdx::tuple, register_values_t>;
 
-//     return [&]() -> write_spec<Group, Paths, register_data_t> {
-//         auto w = write_spec<Group, Paths, register_data_t>{};
-//         [[maybe_unused]] constexpr auto insert =
-//             []<valued_pathlike P>(P const &p, [[maybe_unused]] auto &values)
-//             {
-//                 using matches =
-//                     boost::mp11::mp_copy_if_q<register_values_t,
-//                     resolves_q<P>>;
-//                 using R = boost::mp11::mp_first<matches>;
-//                 auto &dest_reg = stdx::get<R>(values);
-//                 using F = resolve_t<R, typename P::path_t>;
+    //     return [&]() -> write_spec<Group, Paths, register_data_t> {
+    //         auto w = write_spec<Group, Paths, register_data_t>{};
+    //         [[maybe_unused]] constexpr auto insert =
+    //             []<valued_pathlike P>(P const &p, [[maybe_unused]] auto
+    //             &values)
+    //             {
+    //                 using matches =
+    //                     boost::mp11::mp_copy_if_q<register_values_t,
+    //                     resolves_q<P>>;
+    //                 using R = boost::mp11::mp_first<matches>;
+    //                 auto &dest_reg = stdx::get<R>(values);
+    //                 using F = resolve_t<R, typename P::path_t>;
 
-//                 F::insert(dest_reg.value, detail::convert_value<F>(p.value));
-//             };
-//         (insert(ps, w.value), ...);
-//         return w;
-//     }();
-// }
+    //                 F::insert(dest_reg.value,
+    //                 detail::convert_value<F>(p.value));
+    //             };
+    //         (insert(ps, w.value), ...);
+    //         return w;
+    //     }();
+}
 
 namespace detail {
 template <valued_pathlike P> constexpr auto flatten_paths(P &&p) {
@@ -302,15 +306,15 @@ template <valued_pathlike P> constexpr auto flatten_paths(P &&p) {
 }
 } // namespace detail
 
-// template <typename G, valued_pathlike... Ps>
-// constexpr auto tag_invoke(make_spec_t, G, Ps &&...ps) {
-//     return stdx::tuple_cat(detail::flatten_paths(std::forward<Ps>(ps))...)
-//         .apply([]<typename... VPs>(VPs &&...vps) {
-//             using L = boost::mp11::mp_list<
-//                 typename std::remove_cvref_t<VPs>::path_t...>;
-//             detail::check_valid_config<G, L>();
-//             return to_write_spec(read_spec<G, L>{},
-//             std::forward<VPs>(vps)...);
-//         });
-// }
+template <typename G, valued_pathlike... Ps>
+constexpr auto tag_invoke(make_spec_t, G, Ps &&...ps) {
+    detail::check_valid_config<G>(ps...);
+    return stdx::tuple_cat(detail::flatten_paths(std::forward<Ps>(ps))...)
+        .apply([]<typename... VPs>(VPs &&...vps) {
+            return to_write_spec(
+                read_spec<G, typename std::remove_cvref_t<VPs>::path_t...>{
+                    std::forward<VPs>(vps)...},
+                std::forward<VPs>(vps)...);
+        });
+}
 } // namespace groov

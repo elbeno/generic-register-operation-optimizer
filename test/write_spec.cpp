@@ -8,36 +8,36 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-// namespace {
-// struct bus {
-//     struct sender {
-//         using is_sender = void;
-//     };
+namespace {
+struct bus {
+    struct sender {
+        using is_sender = void;
+    };
 
-//     template <stdx::ct_string, auto>
-//     static auto read(auto...) -> async::sender auto {
-//         return sender{};
-//     }
-//     template <stdx::ct_string, auto...>
-//     static auto write(auto...) -> async::sender auto {
-//         return sender{};
-//     }
-// };
+    template <stdx::ct_string, auto>
+    static auto read(auto...) -> async::sender auto {
+        return sender{};
+    }
+    template <stdx::ct_string, auto...>
+    static auto write(auto...) -> async::sender auto {
+        return sender{};
+    }
+};
 
-// using F0 = groov::field<"field0", std::uint8_t, 0, 0>;
-// using F1 = groov::field<"field1", std::uint8_t, 4, 1>;
-// using F2 = groov::field<"field2", std::uint8_t, 7, 5>;
+using F0 = groov::field<"field0", std::uint8_t, 0, 0>;
+using F1 = groov::field<"field1", std::uint8_t, 4, 1>;
+using F2 = groov::field<"field2", std::uint8_t, 7, 5>;
 
-// std::uint32_t data0{};
-// using R0 =
-//     groov::reg<"reg0", std::uint32_t, &data0, groov::w::replace, F0, F1, F2>;
-// std::uint32_t data1{};
-// using R1 =
-//     groov::reg<"reg1", std::uint32_t, &data1, groov::w::replace, F0, F1, F2>;
+std::uint32_t data0{};
+using R0 =
+    groov::reg<"reg0", std::uint32_t, &data0, groov::w::replace, F0, F1, F2>;
+std::uint32_t data1{};
+using R1 =
+    groov::reg<"reg1", std::uint32_t, &data1, groov::w::replace, F0, F1, F2>;
 
-// using G = groov::group<"group", bus, R0, R1>;
-// constexpr auto grp = G{};
-// } // namespace
+using G = groov::group<"group", bus, R0, R1>;
+constexpr auto grp = G{};
+} // namespace
 
 TEST_CASE("flatten_paths (nothing to flatten)", "[write_spec]") {
     using namespace groov::literals;
@@ -46,7 +46,7 @@ TEST_CASE("flatten_paths (nothing to flatten)", "[write_spec]") {
     auto p = "f"_f = 5;
     auto pp = groov::detail::flatten_paths(p);
 
-    using R = std::remove_cvref_t<decltype(pp)>;
+    using R = decltype(pp);
     STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
     STATIC_CHECK(stdx::tuple_size_v<R> == 1);
 
@@ -63,7 +63,7 @@ TEST_CASE("flatten_paths (single depth)", "[write_spec]") {
     auto p = "r"_r("f"_f = 5);
     auto pp = groov::detail::flatten_paths(p);
 
-    using R = std::remove_cvref_t<decltype(pp)>;
+    using R = decltype(pp);
     STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
     STATIC_CHECK(stdx::tuple_size_v<R> == 1);
 
@@ -80,7 +80,7 @@ TEST_CASE("flatten_paths (multi depth)", "[write_spec]") {
     auto p = "r"_r("f"_f("subf"_f = 5));
     auto pp = groov::detail::flatten_paths(p);
 
-    using R = std::remove_cvref_t<decltype(pp)>;
+    using R = decltype(pp);
     STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
     STATIC_CHECK(stdx::tuple_size_v<R> == 1);
 
@@ -97,7 +97,7 @@ TEST_CASE("flatten_paths (multi value)", "[write_spec]") {
     auto p = "r"_r("f0"_f = 5, "f1"_f = 6);
     auto pp = groov::detail::flatten_paths(p);
 
-    using R = std::remove_cvref_t<decltype(pp)>;
+    using R = decltype(pp);
     STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
     STATIC_CHECK(stdx::tuple_size_v<R> == 2);
 
@@ -119,7 +119,7 @@ TEST_CASE("flatten_paths (arbitrary)", "[write_spec]") {
     auto p = "r"_r("f0"_f = 5, "f1"_f("subf0"_f = 6, "subf1"_f = 7));
     auto pp = groov::detail::flatten_paths(p);
 
-    using R = std::remove_cvref_t<decltype(pp)>;
+    using R = decltype(pp);
     STATIC_CHECK(stdx::is_specialization_of_v<R, stdx::tuple>);
     STATIC_CHECK(stdx::tuple_size_v<R> == 3);
 
@@ -139,13 +139,13 @@ TEST_CASE("flatten_paths (arbitrary)", "[write_spec]") {
     CHECK(pp[2_idx].value == 7);
 }
 
-// TEST_CASE("write_spec is made by combining group and paths", "[write_spec]")
-// {
-//     using namespace groov::literals;
-//     auto spec = grp("reg0"_r = 5);
-//     STATIC_CHECK(
-//         stdx::is_specialization_of_v<decltype(spec), groov::write_spec>);
-// }
+TEST_CASE("write_spec is made by combining group and paths", "[write_spec]") {
+    [[maybe_unused]] auto x = grp;
+    // using namespace groov::literals;
+    // auto spec = grp("reg0"_r = 5);
+    // STATIC_CHECK(
+    //     stdx::is_specialization_of_v<decltype(spec), groov::write_spec>);
+}
 
 // TEST_CASE("valid paths are captured", "[write_spec]") {
 //     using namespace groov::literals;

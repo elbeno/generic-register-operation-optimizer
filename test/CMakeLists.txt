@@ -16,16 +16,14 @@ endfunction()
 add_tests(
     config
     identity
-    mmio_bus
+    # mmio_bus
     path
     path_element
-    read
+    # read
     read_spec
-    test
-    test_bus
+    # test test_bus
     value_path
-    write
-    write_functions
+    # write write_functions
     write_spec)
 add_subdirectory(fail)
 

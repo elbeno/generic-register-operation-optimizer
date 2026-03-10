@@ -51,11 +51,10 @@ template <pathlike Path, typename Value> struct value_path : Path {
                     return get<0>(value);
                 } else {
                     return detail::value_path_build_helper(
-                        groov::resolve(static_cast<path_t const &>(*this), p),
-                        value);
+                        groov::resolve(as_path(), p), value);
                 }
             } else {
-                return groov::resolve(static_cast<path_t const &>(*this), p);
+                return groov::resolve(as_path(), p);
             }
         }
     }
@@ -73,12 +72,18 @@ template <pathlike Path, typename Value> struct value_path : Path {
     }
 
     constexpr auto untuple() && {
-        return detail::value_path_build_helper(static_cast<Path &&>(*this),
+        return detail::value_path_build_helper(std::move(*this).as_path(),
                                                get<0>(std::move(value)));
     }
     constexpr auto untuple() const & {
-        return detail::value_path_build_helper(static_cast<Path const &>(*this),
-                                               get<0>(value));
+        return detail::value_path_build_helper(as_path(), get<0>(value));
+    }
+
+    constexpr auto as_path() && LIFETIMEBOUND -> decltype(auto) {
+        return static_cast<path_t &&>(*this);
+    }
+    constexpr auto as_path() const & LIFETIMEBOUND -> decltype(auto) {
+        return static_cast<path_t const &>(*this);
     }
 
   private:

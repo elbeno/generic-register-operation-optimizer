@@ -35,6 +35,13 @@ TEST_CASE("read_spec is made by combining group and paths", "[read_spec]") {
         stdx::is_specialization_of_v<decltype(spec), groov::read_spec>);
 }
 
+TEST_CASE("read_spec has no size when given compile-time paths",
+          "[read_spec]") {
+    using namespace groov::literals;
+    auto spec = grp("reg0"_r, "reg1"_r);
+    STATIC_CHECK(sizeof(spec) == 1);
+}
+
 TEST_CASE("valid paths are captured", "[read_spec]") {
     using namespace groov::literals;
     using namespace stdx::literals;
@@ -73,11 +80,4 @@ TEST_CASE("operator/ is overloaded to make read_spec", "[read_spec]") {
     STATIC_CHECK(stdx::is_specialization_of_v<T, stdx::tuple>);
     STATIC_CHECK(stdx::tuple_size_v<T> == 1);
     STATIC_CHECK(equivalent(spec.paths[0_idx], "reg0"_r));
-}
-
-TEST_CASE("read_spec has no size when given compile-time paths",
-          "[read_spec]") {
-    using namespace groov::literals;
-    auto spec = grp("reg0"_r, "reg1"_r);
-    STATIC_CHECK(sizeof(spec) == 1);
 }

@@ -122,9 +122,10 @@ auto write(Spec const &s) -> async::sender auto {
                                                     typename Spec::value_t,
                                                     written_fields_per_reg_t>;
 
-    detail::check_read_only<typename Spec::bus_t, fields_per_reg_t>();
-    detail::check_rmw<typename Spec::bus_t, unwritten_fields_per_reg_t,
-                      field_masks_t>();
+    detail::check_read_only<typename Spec::template bus_t<>,
+                            fields_per_reg_t>();
+    detail::check_rmw<typename Spec::template bus_t<>,
+                      unwritten_fields_per_reg_t, field_masks_t>();
 
     using identity_masks_t =
         boost::mp11::mp_transform<detail::compute_id_mask_t,
@@ -147,7 +148,8 @@ auto write(Spec const &s) -> async::sender auto {
                []<typename R, typename Mask, typename IdMask, typename IdValue,
                   typename RegIdMask, typename RegIdValue>(
                    R const &r, Mask, IdMask, IdValue, RegIdMask, RegIdValue) {
-                   return detail::write<R, typename Spec::bus_t, Mask::value,
+                   return detail::write<R, typename Spec::template bus_t<>,
+                                        Mask::value,
                                         (IdMask::value | RegIdMask::value),
                                         (IdValue::value | RegIdValue::value)>(
                        r.value);

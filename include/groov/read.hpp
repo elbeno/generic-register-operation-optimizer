@@ -30,7 +30,7 @@ namespace groov {
 namespace detail {
 template <typename Register, typename Group, typename Mask>
 auto read() -> async::sender auto {
-    using bus_t = typename Group::bus_t;
+    using bus_t = typename Group::template bus_t<>;
     return bus_t::template read<Register::name, Mask::value>(
         get_address<Register>());
 }
@@ -109,8 +109,8 @@ constexpr auto read_as(read_spec<Group, Paths> const &s) -> async::sender auto {
         detail::field_mask_for_reg_q<typename Spec::paths_t>,
         typename Spec::value_t>;
 
-    detail::check_write_only<typename Spec::bus_t, read_fields_per_reg_t,
-                             field_masks_t>();
+    detail::check_write_only<typename Spec::template bus_t<>,
+                             read_fields_per_reg_t, field_masks_t>();
 
     using R = stdx::conditional_t<std::is_void_v<T>, Spec, T>;
     detail::check_read_conversion<R, Spec>();

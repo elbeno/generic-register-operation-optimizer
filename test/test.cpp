@@ -1,21 +1,9 @@
+#include <groov/groov.hpp>
 #include <groov/test.hpp>
 
-#include <cstdint>
-
-//----------------------------------------------------------------
-namespace {
-struct my_test_bus;
-}
-namespace groov::test {
-
-using test_bus_list = make_test_bus_list<default_test_bus<"test_group_0">,
-                                         test_bus<"test_group_1", my_test_bus>>;
-} // namespace groov::test
-//----------------------------------------------------------------
-
-#include <groov/groov.hpp>
-
 #include <catch2/catch_test_macros.hpp>
+
+#include <cstdint>
 
 namespace {
 struct my_test_bus {
@@ -73,6 +61,11 @@ using G1 = groov::group<"test_group_1", my_bus, R0, R1>;
 constexpr auto grp1 = G1{};
 
 } // namespace
+
+namespace groov::test {
+using test_bus_list = make_test_bus_list<default_test_bus<"test_group_0">,
+                                         test_bus<"test_group_1", my_test_bus>>;
+} // namespace groov::test
 
 TEST_CASE("can get a write_spec from a test_bus register", "[test]") {
     using namespace groov::literals;

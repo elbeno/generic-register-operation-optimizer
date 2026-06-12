@@ -23,18 +23,9 @@
 #include <limits>
 #include <type_traits>
 
-#ifndef ENABLE_GROOV_TEST
-namespace groov::test {
-using test_bus_list = stdx::type_map<>;
-}
-#endif
-
-namespace groov::detail {
-template <stdx::ct_string Name, typename T>
-using get_bus = stdx::type_lookup_t<test::test_bus_list, stdx::cts_t<Name>, T>;
-}
-
 namespace groov {
+namespace test {}
+
 namespace detail {
 template <typename T> using name_of = typename T::name_t;
 } // namespace detail
@@ -202,10 +193,31 @@ concept bus_for = requires(typename Reg::type_t data) {
     } -> async::sender;
 };
 
+namespace detail::default_test_bus_list {
+using test_bus_list = void;
+}
+
+namespace test {
+template <typename Bus> consteval auto get_test_bus_list() {
+    using namespace ::groov::detail::default_test_bus_list;
+    if constexpr (not std::is_same_v<test_bus_list, void>) {
+        return test_bus_list{};
+    } else {
+        return stdx::type_list<>{};
+    }
+}
+} // namespace test
+
 template <stdx::ct_string Name, typename Bus, registerlike... Registers>
     requires(... and bus_for<Bus, Registers>)
 struct group : named_container<Name, Registers...> {
-    using bus_t = detail::get_bus<Name, Bus>;
+    template <typename...> consteval static auto get_bus() {
+        return stdx::type_lookup_t<
+            decltype(::groov::test::get_test_bus_list<Bus>()),
+            stdx::cts_t<Name>, Bus>{};
+    }
+
+    template <typename... Ts> using bus_t = decltype(get_bus<Ts...>());
 
     template <pathlike P> constexpr static auto resolve(P p) {
         return detail::recursive_resolve<group>(p);

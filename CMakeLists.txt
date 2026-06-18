@@ -6,6 +6,8 @@ project(
     LANGUAGES CXX
     DESCRIPTION "A generic register operation optimizer.")
 
+set(INFRA_PYTHON_FORMATTER black)
+
 include(cmake/get_cpm.cmake)
 if(PROJECT_IS_TOP_LEVEL)
     cpmaddpackage("gh:intel/cicd-repo-infrastructure#dev")
